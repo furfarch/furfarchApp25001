@@ -1,0 +1,46 @@
+name: CI Build & Upload to TestFlight
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-upload:
+    name: Build and upload to TestFlight
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Install fastlane
+        run: |
+          gem install bundler -v 2.4.13
+          bundle config set --local path 'vendor/bundle' || true
+          bundle install || gem install fastlane -NV
+
+      - name: Write App Store Connect API Key
+        env:
+          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        run: |
+          mkdir -p fastlane/credentials
+          if [[ "$APP_STORE_CONNECT_KEY" == *"BEGIN PRIVATE KEY"* ]]; then
+            echo "$APP_STORE_CONNECT_KEY" > fastlane/credentials/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          else
+            echo "$APP_STORE_CONNECT_KEY" | base64 --decode > fastlane/credentials/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          fi
+
+      - name: Run fastlane lane
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          FASTLANE_APPLE_API_KEY_PATH: fastlane/credentials/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          PROJECT_PATH: furfarchApp25001.xcodeproj
+          SCHEME: furfarchApp25001
+        run: |
+          bundle exec fastlane ci_beta

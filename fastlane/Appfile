@@ -1,0 +1,2 @@
+app_identifier("furfarch.furfarchApp25001") # bundle identifier
+apple_id("") # your Apple ID (optional)
