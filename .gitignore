@@ -1,0 +1,17 @@
+# Xcode
+.DS_Store
+build/
+DerivedData/
+fastlane/credentials/
+**/fastlane/credentials/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# macOS
+*.DS_Store
+
+# Bundler
+/vendor/bundle
+
+# Temporary export dir
+/tmp/
