@@ -14,7 +14,7 @@ struct DriveLogListView: View {
                 ContentUnavailableView("No drive logs", systemImage: "car", description: Text("Tap + to add your first log."))
             } else {
                 ForEach(logs) { log in
-                    NavigationLink(value: log) {
+                    NavigationLink(destination: DriveLogEditorView(log: log)) {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(log.vehicle.brandModel.isEmpty ? log.vehicle.type.displayName : log.vehicle.brandModel)
@@ -42,9 +42,6 @@ struct DriveLogListView: View {
                 Button { showingNew = true } label: { Image(systemName: "plus") }
                     .disabled(vehicles.isEmpty)
             }
-        }
-        .navigationDestination(for: DriveLog.self) { log in
-            DriveLogEditorView(log: log)
         }
         .sheet(isPresented: $showingNew) {
             if let firstVehicle = vehicles.first {
@@ -180,61 +177,6 @@ struct ChecklistRunnerView: View {
                 checklist.items[idx] = updated
             }
         })
-    }
-}
-
-struct DriveLogFormView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    var vehicle: Vehicle?
-
-    @State private var date: Date = .now
-    @State private var reason: String = ""
-    @State private var kmStart: String = ""
-    @State private var kmEnd: String = ""
-    @State private var notes: String = ""
-
-    var body: some View {
-        Form {
-            if let v = vehicle {
-                Section("Vehicle") { HStack { Text(v.brandModel.isEmpty ? v.type.displayName : v.brandModel); Spacer(); Text(v.plate).foregroundStyle(.secondary) } }
-            }
-            Section("Details") {
-                DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                TextField("Reason", text: $reason)
-                TextField("KM Start", text: $kmStart).keyboardType(.numberPad)
-                TextField("KM End", text: $kmEnd).keyboardType(.numberPad)
-                TextField("Notes", text: $notes, axis: .vertical)
-            }
-        }
-        .navigationTitle("Drive Log")
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } } }
-    }
-
-    private func save() {
-        let v = vehicle
-        guard let v else { return }
-        let start = Int(kmStart) ?? 0
-        let end = Int(kmEnd) ?? 0
-        let log = DriveLog(vehicle: v, date: date, reason: reason, kmStart: start, kmEnd: end, notes: notes, checklist: nil, lastEdited: .now)
-        modelContext.insert(log)
-        try? modelContext.save()
-        dismiss()
-    }
-}
-
-struct ChecklistPickerView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Binding var selected: Checklist?
-    @Query(sort: \Checklist.lastEdited, order: .reverse) private var checklists: [Checklist]
-
-    var body: some View {
-        List {
-            ForEach(checklists) { c in
-                Button { selected = c } label: { Text(c.title) }
-            }
-        }
-        .navigationTitle("Checklists")
     }
 }
 

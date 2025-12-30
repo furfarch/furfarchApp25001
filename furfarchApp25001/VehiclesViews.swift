@@ -116,7 +116,6 @@ struct VehicleFormView: View {
     @State private var showingPlateScanner = false
     @State private var showingCarPhotoPicker = false
     @State private var saveErrorMessage: String? = nil
-    @State private var selectedChecklist: Checklist? = nil
 
     var vehicle: Vehicle?
 
@@ -136,6 +135,17 @@ struct VehicleFormView: View {
     }
 
     @Query private var trailers: [Trailer]
+    @Query(sort: \DriveLog.date, order: .reverse) private var allDriveLogs: [DriveLog]
+    @Query(sort: \Checklist.lastEdited, order: .reverse) private var allChecklists: [Checklist]
+
+    // Helpers to avoid heavy inline view expressions
+    private func recentLogs(for vehicle: Vehicle, limit: Int = 3) -> [DriveLog] {
+        allDriveLogs.filter { $0.vehicle.id == vehicle.id }
+    }
+
+    private func checklists(for vehicle: Vehicle) -> [Checklist] {
+        allChecklists.filter { $0.vehicleType == vehicle.type }
+    }
 
     var body: some View {
         Form {
@@ -225,13 +235,9 @@ struct VehicleFormView: View {
 
             if vehicle != nil {
                 Section("Actions") {
-                    NavigationLink("Add Drive Log") {
-                        DriveLogFormView(vehicle: vehicle)
-                    }
-
-                    NavigationLink("Add Checklist") {
-                        ChecklistPickerView(selected: $selectedChecklist)
-                    }
+                    // Add Drive Log and Checklist will be wired in next increment
+                    NavigationLink("Add Drive Log") { Text("Drive Log Form (coming next)") }
+                    NavigationLink("Add Checklist") { Text("Checklist Form (coming next)") }
                 }
             }
 
