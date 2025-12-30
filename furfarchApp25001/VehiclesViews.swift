@@ -13,11 +13,9 @@ struct VehiclesListView: View {
                     VehicleFormView(vehicle: v).environment(\.modelContext, modelContext)
                 } label: {
                     HStack(spacing: 12) {
-                        vehicleIcon(for: v)
-                            .resizable()
-                            .scaledToFit()
+                        // use a view helper so we can composite trailer overlays and ensure visibility in Dark Mode
+                        vehicleIconView(for: v)
                             .frame(width: 28, height: 28)
-                            .foregroundStyle(.primary)
                         VStack(alignment: .leading) {
                             Text(v.brandModel.isEmpty ? v.type.displayName : v.brandModel)
                                 .font(.headline)
@@ -53,27 +51,51 @@ struct VehiclesListView: View {
         }
     }
 
-    private func vehicleIcon(for v: Vehicle) -> Image {
+    // New: a View that returns a composed icon (base + optional trailer overlay). Uses adaptive background for dark mode.
+    private func vehicleIconView(for v: Vehicle) -> some View {
+        // choose base image (either system or asset)
+        let base: Image
         switch v.type {
         case .car:
-            if v.trailer != nil { return Image("car_with_trailer_2") }
-            return Image(systemName: "car")
+            base = Image(systemName: "car")
         case .van:
-            if v.trailer != nil { return Image("car_with_trailer_2") }
-            return Image("icons8-van-100")
+            base = Image("icons8-van-100")
         case .truck:
-            if v.trailer != nil { return Image("icons8-truck-with-trailer-50") }
-            return Image(systemName: "truck.box")
+            base = Image(systemName: "truck.box")
         case .trailer:
-            return Image("icons8-utility-trailer-96")
+            base = Image("icons8-utility-trailer-96")
         case .camper:
-            return Image("icons8-camper-100")
+            base = Image("icons8-camper-100")
         case .boat:
-            return Image(systemName: "sailboat")
+            base = Image(systemName: "sailboat")
         case .motorbike:
-            return Image("icons8-motorbike-100")
+            // prefer asset if present, else fallback to bicycle symbol
+            base = Image("icons8-motorbike-100")
         case .other:
-            return Image(systemName: "questionmark.circle")
+            base = Image(systemName: "questionmark.circle")
+        }
+
+        return GeometryReader { geo in
+            ZStack {
+                // subtle rounded rect background to improve contrast in dark mode for asset images
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(.tertiarySystemBackground))
+                    .opacity(0.85)
+                base
+                    .resizable()
+                    .scaledToFit()
+                    .padding(4)
+                    .foregroundStyle(.primary)
+
+                if v.trailer != nil {
+                    // overlay a small trailer icon at bottom-right
+                    Image("icons8-utility-trailer-96")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width * 0.45, height: geo.size.height * 0.45)
+                        .offset(x: geo.size.width * 0.22, y: geo.size.height * 0.22)
+                }
+            }
         }
     }
 }
@@ -259,17 +281,17 @@ struct VehicleFormView: View {
 
     private func typeButton(_ t: VehicleType, label: String, assetName: String? = nil, systemName: String? = nil, systemNameFallback: String? = nil) -> some View {
         Button {
-            // Update the local state for type
             type = t
             print("DEBUG: selected type=\(t)")
         } label: {
             VStack(spacing: 6) {
                 if let assetName { Image(assetName).resizable().scaledToFit().frame(width: 28, height: 28) }
                 else if let systemName { Image(systemName: systemName).resizable().scaledToFit().frame(width: 28, height: 28) }
-                else if let systemNameFallback { Image(systemName: systemNameFallback).resizable().scaledToFit().frame(width: 28, height: 28) }
+                else if let fallback = systemNameFallback { Image(systemName: fallback).resizable().scaledToFit().frame(width: 28, height: 28) }
                 Text(label).font(.caption)
             }
             .padding(8)
+            .background(type == t ? Color.accentColor.opacity(0.15) : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
