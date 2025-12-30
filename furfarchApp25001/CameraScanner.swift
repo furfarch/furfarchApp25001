@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import UIKit
+import Combine
 
 @MainActor
 final class CameraScannerModel: ObservableObject {
@@ -21,6 +22,10 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         self.model = model
         super.init()
         setupSession()
+    }
+
+    deinit {
+        stop()
     }
 
     private func setupSession() {
@@ -46,8 +51,18 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
         session.addOutput(output)
 
-        if let connection = output.connection(with: .video), connection.isVideoOrientationSupported {
-            connection.videoOrientation = .portrait
+        if let connection = output.connection(with: .video) {
+            if #available(iOS 17.0, *) {
+                // Rotate frames for portrait UI. Common angles supported: 0, 90, 180, 270.
+                let desiredAngle: CGFloat = 90
+                if connection.isVideoRotationAngleSupported(desiredAngle) {
+                    connection.videoRotationAngle = desiredAngle
+                }
+            } else {
+                if connection.isVideoOrientationSupported {
+                    connection.videoOrientation = .portrait
+                }
+            }
         }
 
         previewLayer.session = session
@@ -69,13 +84,33 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // Prevent overlapping processing; add a safety reset in case the recognizer callback never fires
         guard !isProcessing else { return }
         isProcessing = true
 
+        // Create a timeout work item that will reset isProcessing if the recognizer callback doesn't complete
+        var timeoutWorkItem: DispatchWorkItem?
+        timeoutWorkItem = DispatchWorkItem { [weak self] in
+            print("CameraScanner: recognition timeout — resetting processing flag")
+            self?.isProcessing = false
+            timeoutWorkItem = nil
+        }
+        // schedule timeout on the same queue so we don't race with callback cancellation
+        queue.asyncAfter(deadline: .now() + 2.0, execute: timeoutWorkItem!)
+
+        // Call the existing recognizer API (keep API usage unchanged)
         PlateRecognizer.recognize(from: sampleBuffer) { [weak self] result in
+            // cancel the timeout and set results on main actor
+            timeoutWorkItem?.cancel()
+            timeoutWorkItem = nil
+
             guard let self = self else { return }
             Task { @MainActor in
                 self.model.latestResult = result
+                // small defensive delay to avoid UI presentation/dismissal races
+                // (ensure we do not remain stuck in processing if UI changes occur immediately)
+                // Use async sleep to yield briefly on main actor
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
                 self.isProcessing = false
             }
         }

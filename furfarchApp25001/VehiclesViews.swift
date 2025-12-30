@@ -116,6 +116,7 @@ struct VehicleFormView: View {
     @State private var showingPlateScanner = false
     @State private var showingCarPhotoPicker = false
     @State private var saveErrorMessage: String? = nil
+    @State private var selectedChecklist: Checklist? = nil
 
     var vehicle: Vehicle?
 
@@ -224,9 +225,13 @@ struct VehicleFormView: View {
 
             if vehicle != nil {
                 Section("Actions") {
-                    // Add Drive Log and Checklist will be wired in next increment
-                    NavigationLink("Add Drive Log") { Text("Drive Log Form (coming next)") }
-                    NavigationLink("Add Checklist") { Text("Checklist Form (coming next)") }
+                    NavigationLink("Add Drive Log") {
+                        DriveLogFormView(vehicle: vehicle)
+                    }
+
+                    NavigationLink("Add Checklist") {
+                        ChecklistPickerView(selected: $selectedChecklist)
+                    }
                 }
             }
 

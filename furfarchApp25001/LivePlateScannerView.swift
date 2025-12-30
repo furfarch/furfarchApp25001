@@ -6,7 +6,6 @@ struct CameraPreviewView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
-        previewLayer.frame = UIScreen.main.bounds
         view.layer.addSublayer(previewLayer)
         return view
     }
