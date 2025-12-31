@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import AVFoundation
 
 struct CameraPreviewView: UIViewRepresentable {
@@ -51,11 +52,6 @@ struct LivePlateScannerView: View {
                 }
             }
             .padding(.bottom, 30)
-        }
-        .onReceive(model.$latestResult) { new in
-            if let r = new {
-                print("DEBUG: LivePlateScannerView detected result best=\(r.bestMatch ?? "<nil>") candidates=\(r.rawCandidates)")
-            }
         }
     }
 }
