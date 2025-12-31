@@ -9,8 +9,10 @@ struct PlateRecognitionResult {
 }
 
 enum PlateRecognizer {
-    // Adjust regex to your region's plate format as needed
-    private static let plateRegex = try! NSRegularExpression(pattern: "^[A-Z0-9\\-]{5,10}$", options: [])
+    // Use a relaxed regex suitable for most European plates (Switzerland, Finland, others):
+    // allow 2–12 characters composed of uppercase letters, digits and dashes. We normalize
+    // candidates before matching (spaces are removed), so this covers common variations.
+    private static let plateRegex = try! NSRegularExpression(pattern: "^[A-Z0-9\\-]{2,12}$", options: [])
 
     static func recognize(from image: UIImage, completion: @escaping (PlateRecognitionResult) -> Void) {
         let request = VNRecognizeTextRequest { req, err in
@@ -179,4 +181,3 @@ enum PlateRecognizer {
     }
     #endif
 }
-

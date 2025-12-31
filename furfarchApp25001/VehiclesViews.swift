@@ -45,9 +45,9 @@ struct VehiclesListView: View {
         }
         .sheet(isPresented: $showingAdd) {
             NavigationStack {
-                AddVehicleFlowView()
+                VehicleFormView(vehicle: nil)
+                    .environment(\.modelContext, modelContext)
             }
-            .environment(\.modelContext, modelContext)
         }
     }
 
@@ -135,17 +135,6 @@ struct VehicleFormView: View {
     }
 
     @Query private var trailers: [Trailer]
-    @Query(sort: \DriveLog.date, order: .reverse) private var allDriveLogs: [DriveLog]
-    @Query(sort: \Checklist.lastEdited, order: .reverse) private var allChecklists: [Checklist]
-
-    // Helpers to avoid heavy inline view expressions
-    private func recentLogs(for vehicle: Vehicle, limit: Int = 3) -> [DriveLog] {
-        allDriveLogs.filter { $0.vehicle.id == vehicle.id }
-    }
-
-    private func checklists(for vehicle: Vehicle) -> [Checklist] {
-        allChecklists.filter { $0.vehicleType == vehicle.type }
-    }
 
     var body: some View {
         Form {

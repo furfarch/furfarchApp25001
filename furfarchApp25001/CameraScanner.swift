@@ -6,6 +6,7 @@ import Combine
 @MainActor
 final class CameraScannerModel: ObservableObject {
     @Published var latestResult: PlateRecognitionResult?
+    @Published var cameraError: String?
 }
 
 final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -24,10 +25,6 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         setupSession()
     }
 
-    deinit {
-        stop()
-    }
-
     private func setupSession() {
         session.beginConfiguration()
         session.sessionPreset = .high
@@ -35,7 +32,9 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(input) else {
-            print("CameraScanner: cannot create camera input")
+            let msg = "CameraScanner: cannot create camera input"
+            print(msg)
+            model.cameraError = msg
             session.commitConfiguration()
             return
         }
@@ -45,7 +44,9 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         output.setSampleBufferDelegate(self, queue: queue)
         output.alwaysDiscardsLateVideoFrames = true
         guard session.canAddOutput(output) else {
-            print("CameraScanner: cannot add video output")
+            let msg = "CameraScanner: cannot add video output"
+            print(msg)
+            model.cameraError = msg
             session.commitConfiguration()
             return
         }
@@ -84,33 +85,13 @@ final class CameraScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // Prevent overlapping processing; add a safety reset in case the recognizer callback never fires
         guard !isProcessing else { return }
         isProcessing = true
 
-        // Create a timeout work item that will reset isProcessing if the recognizer callback doesn't complete
-        var timeoutWorkItem: DispatchWorkItem?
-        timeoutWorkItem = DispatchWorkItem { [weak self] in
-            print("CameraScanner: recognition timeout — resetting processing flag")
-            self?.isProcessing = false
-            timeoutWorkItem = nil
-        }
-        // schedule timeout on the same queue so we don't race with callback cancellation
-        queue.asyncAfter(deadline: .now() + 2.0, execute: timeoutWorkItem!)
-
-        // Call the existing recognizer API (keep API usage unchanged)
         PlateRecognizer.recognize(from: sampleBuffer) { [weak self] result in
-            // cancel the timeout and set results on main actor
-            timeoutWorkItem?.cancel()
-            timeoutWorkItem = nil
-
             guard let self = self else { return }
             Task { @MainActor in
                 self.model.latestResult = result
-                // small defensive delay to avoid UI presentation/dismissal races
-                // (ensure we do not remain stuck in processing if UI changes occur immediately)
-                // Use async sleep to yield briefly on main actor
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
                 self.isProcessing = false
             }
         }

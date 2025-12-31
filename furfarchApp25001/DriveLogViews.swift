@@ -14,7 +14,7 @@ struct DriveLogListView: View {
                 ContentUnavailableView("No drive logs", systemImage: "car", description: Text("Tap + to add your first log."))
             } else {
                 ForEach(logs) { log in
-                    NavigationLink(destination: DriveLogEditorView(log: log)) {
+                    NavigationLink(value: log) {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(log.vehicle.brandModel.isEmpty ? log.vehicle.type.displayName : log.vehicle.brandModel)
@@ -42,6 +42,9 @@ struct DriveLogListView: View {
                 Button { showingNew = true } label: { Image(systemName: "plus") }
                     .disabled(vehicles.isEmpty)
             }
+        }
+        .navigationDestination(for: DriveLog.self) { log in
+            DriveLogEditorView(log: log)
         }
         .sheet(isPresented: $showingNew) {
             if let firstVehicle = vehicles.first {
@@ -177,59 +180,6 @@ struct ChecklistRunnerView: View {
                 checklist.items[idx] = updated
             }
         })
-    }
-}
-
-struct ChecklistItemRow: View {
-    @Binding var item: ChecklistItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(item.title)
-                Spacer()
-                Menu {
-                    Button("Not selected") { item.state = .notSelected }
-                    Button("Selected") { item.state = .selected }
-                    Button("Not applicable") { item.state = .notApplicable }
-                } label: {
-                    Label(label(for: item.state), systemImage: icon(for: item.state))
-                        .labelStyle(.titleAndIcon)
-                }
-            }
-            if let note = item.note {
-                Text(note).font(.footnote).foregroundStyle(.secondary)
-            }
-            Button("Add/Edit note") {
-                // Simple inline prompt for note
-                promptForNote()
-            }
-            .buttonStyle(.borderless)
-        }
-    }
-
-    private func label(for state: ChecklistItemState) -> String {
-        switch state {
-        case .notSelected: return "Not selected"
-        case .selected: return "Selected"
-        case .notApplicable: return "Not applicable"
-        }
-    }
-
-    private func icon(for state: ChecklistItemState) -> String {
-        switch state {
-        case .notSelected: return "circle"
-        case .selected: return "checkmark.circle.fill"
-        case .notApplicable: return "minus.circle"
-        }
-    }
-
-    private func promptForNote() {
-        // This simplistic approach toggles through preset notes for demo purposes.
-        // Replace with a proper editor if desired.
-        if item.note == nil { item.note = "" }
-        else if item.note == "" { item.note = "Add details…" }
-        else { item.note = nil }
     }
 }
 
