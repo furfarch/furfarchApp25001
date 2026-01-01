@@ -38,16 +38,15 @@ struct PlateScannerView: View {
         .sheet(isPresented: $showingCamera) {
             // Use the CameraPickerUniversal implementation from CarPhotoPickerView.swift
             CameraPickerUniversal { image in
+                // Keep the sheet open while processing so the user can see progress and results
                 print("DEBUG: PlateScanner CameraPickerUniversal completion invoked; image=\(image != nil)")
-                // Dismiss the camera UI immediately so processing UI is visible
-                DispatchQueue.main.async { showingCamera = false }
-
                 guard let image = image else {
-                    // user cancelled
+                    // user cancelled camera — just close the sheet
+                    DispatchQueue.main.async { showingCamera = false }
                     return
                 }
 
-                // Start processing and show progress
+                // Start processing on main so UI updates are immediate
                 DispatchQueue.main.async {
                     isProcessing = true
                     recognizedPlate = nil
@@ -59,16 +58,12 @@ struct PlateScannerView: View {
                         print("DEBUG: PlateRecognizer result best=\(result.bestMatch ?? "<nil>") candidates=\(result.rawCandidates)")
                         isProcessing = false
                         rawCandidates = result.rawCandidates
+
+                        // Do NOT auto-accept the best match. Show it to the user for confirmation.
                         recognizedPlate = result.bestMatch
+                        // keep the sheet dismissed so the parent shows progress/results
                     }
                 }
-            }
-        }
-        // provide quick retry button when nothing recognized
-        .overlay(alignment: .bottom) {
-            if !isProcessing && recognizedPlate == nil && rawCandidates.isEmpty {
-                Button("Retry Scan") { showingCamera = true }
-                    .padding(.bottom, 8)
             }
         }
     }
