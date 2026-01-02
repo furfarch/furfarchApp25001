@@ -73,14 +73,16 @@ final class Trailer {
     var color: String
     var plate: String
     var notes: String
+    var photoData: Data?
     var lastEdited: Date
 
-    init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = .now) {
+    init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = .now, photoData: Data? = nil) {
         self.id = UUID()
         self.brandModel = brandModel
         self.color = color
         self.plate = plate
         self.notes = notes
+        self.photoData = photoData
         self.lastEdited = lastEdited
     }
 }

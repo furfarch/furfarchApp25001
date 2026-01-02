@@ -59,18 +59,18 @@ struct VehiclesListView: View {
         case .car:
             base = Image(systemName: "car")
         case .van:
-            base = Image("icons8-van-100")
+            base = Image("VAN")
         case .truck:
             base = Image(systemName: "truck.box")
         case .trailer:
-            base = Image("icons8-utility-trailer-96")
+            base = Image("TRAILER_CAR")
         case .camper:
-            base = Image("icons8-camper-100")
+            base = Image("CAMPER")
         case .boat:
             base = Image(systemName: "sailboat")
         case .motorbike:
             // prefer asset if present, else fallback to bicycle symbol
-            base = Image("icons8-motorbike-100")
+            base = Image("MOTORBIKE")
         case .other:
             base = Image(systemName: "questionmark.circle")
         }
@@ -89,7 +89,7 @@ struct VehiclesListView: View {
 
                 if v.trailer != nil {
                     // overlay a small trailer icon at bottom-right
-                    Image("icons8-utility-trailer-96")
+                    Image("TRAILER_CAR")
                         .resizable()
                         .scaledToFit()
                         .frame(width: geo.size.width * 0.45, height: geo.size.height * 0.45)
@@ -143,15 +143,18 @@ struct VehicleFormView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         typeButton(.car, label: "Car", systemName: "car")
-                        typeButton(.van, label: "Van", assetName: "icons8-van-100")
+                        typeButton(.van, label: "Van", assetName: "VAN")
                         typeButton(.truck, label: "Truck", systemName: "truck.box")
-                        typeButton(.trailer, label: "Trailer", assetName: "icons8-utility-trailer-96")
-                        typeButton(.camper, label: "Camper", assetName: "icons8-camper-100")
-                        typeButton(.boat, label: "Boat", assetName: "icons8-boat-100", systemNameFallback: "sailboat")
-                        typeButton(.motorbike, label: "Motorbike", assetName: "icons8-motorbike-100")
+                        typeButton(.trailer, label: "Trailer", assetName: "TRAILER_CAR")
+                        typeButton(.camper, label: "Camper", assetName: "CAMPER")
+                        typeButton(.boat, label: "Boat", systemName: "sailboat")
+                        // Scooter shares the motorbike type in the current data model
+                        typeButton(.motorbike, label: "Scooter", systemName: "scooter", systemNameFallback: "bicycle")
+                        typeButton(.motorbike, label: "Motorbike", assetName: "MOTORBIKE")
                         typeButton(.other, label: "Other", systemNameFallback: "questionmark.circle")
                     }
                     .padding(.vertical, 4)
+                    .frame(minHeight: 56)
                 }
             }
 
@@ -196,7 +199,8 @@ struct VehicleFormView: View {
                     DispatchQueue.main.async {
                         if let img = img {
                             self.carPhoto = img
-                            print("DEBUG: VehicleFormView carPhoto set (vehicle id=\(vehicle?.id.uuidString ?? "new"))")
+                            let vid = vehicle?.id.uuidString ?? "new"
+                            print("DEBUG: VehicleFormView carPhoto set (vehicle id=\(vid))")
                         } else {
                             print("DEBUG: VehicleFormView CarPhotoPicker returned nil")
                         }
@@ -295,18 +299,15 @@ struct VehicleFormView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-    }
+        .frame(width: 78)
+     }
 }
 
 struct TrailerPickerInline: View {
     @Environment(\.modelContext) private var modelContext
     @Binding var selection: Trailer?
     @Query(sort: \Trailer.lastEdited, order: .reverse) private var trailers: [Trailer]
-    @State private var creating = false
-    @State private var newBrandModel = ""
-    @State private var newColor = ""
-    @State private var newPlate = ""
-    @State private var newNotes = ""
+    @State private var showingNewTrailer = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -320,29 +321,24 @@ struct TrailerPickerInline: View {
             .pickerStyle(.menu)
 
             Button {
-                creating.toggle()
+                showingNewTrailer = true
             } label: {
-                Label(creating ? "Cancel New Trailer" : "Create New Trailer", systemImage: creating ? "xmark.circle" : "plus.circle")
+                Label("Add New Trailer", systemImage: "plus.circle")
             }
-
-            if creating {
-                TextField("Brand / Model", text: $newBrandModel)
-                TextField("Color", text: $newColor)
-                TextField("Plate", text: $newPlate)
-                TextField("Notes", text: $newNotes, axis: .vertical)
-                Button {
-                    let t = Trailer(brandModel: newBrandModel, color: newColor, plate: newPlate, notes: newNotes, lastEdited: .now)
-                    modelContext.insert(t)
-                    selection = t
-                    creating = false
-                    newBrandModel = ""; newColor = ""; newPlate = ""; newNotes = ""
-                } label: {
-                    Label("Save Trailer", systemImage: "checkmark.circle")
+            .sheet(isPresented: $showingNewTrailer) {
+                NavigationStack {
+                    NewTrailerFormView { newTrailer in
+                        modelContext.insert(newTrailer)
+                        selection = newTrailer
+                        try? modelContext.save()
+                        showingNewTrailer = false
+                    }
                 }
             }
         }
     }
 }
+
 struct AddVehicleFlowView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -362,24 +358,32 @@ struct AddVehicleFlowView: View {
     @State private var saveErrorMessage: String? = nil
     @State private var saveSuccessMessage: String? = nil
 
+    // Break out the type selection row to keep the compiler happy.
+    private var typeSelectionRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                typeButton(.car, label: "Car", systemName: "car")
+                typeButton(.van, label: "Van", assetName: "VAN")
+                typeButton(.truck, label: "Truck", systemName: "truck.box")
+                typeButton(.trailer, label: "Trailer", assetName: "TRAILER_CAR")
+                typeButton(.camper, label: "Camper", assetName: "CAMPER")
+                typeButton(.boat, label: "Boat", systemName: "sailboat")
+                // Scooter shares the motorbike type in the current data model
+                typeButton(.motorbike, label: "Scooter", systemName: "scooter")
+                typeButton(.motorbike, label: "Motorbike", assetName: "MOTORBIKE")
+                typeButton(.other, label: "Other", systemName: "questionmark.circle")
+            }
+            .padding(.vertical, 4)
+            .frame(minHeight: 56)
+        }
+    }
+
     var body: some View {
         Group {
             if step == 1 {
                 Form {
                     Section("Select Type") {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                typeButton(.car, label: "Car", systemName: "car")
-                                typeButton(.van, label: "Van", assetName: "icons8-van-100")
-                                typeButton(.truck, label: "Truck", systemName: "truck.box")
-                                typeButton(.trailer, label: "Trailer", assetName: "icons8-utility-trailer-96")
-                                typeButton(.camper, label: "Camper", assetName: "icons8-camper-100")
-                                typeButton(.boat, label: "Boat", systemName: "sailboat")
-                                typeButton(.motorbike, label: "Motorbike", assetName: "icons8-motorbike-100")
-                                typeButton(.other, label: "Other", systemName: "questionmark.circle")
-                            }
-                            .padding(.vertical, 4)
-                        }
+                        typeSelectionRow
                     }
                 }
                 .navigationTitle("New Vehicle")
@@ -425,7 +429,8 @@ struct AddVehicleFlowView: View {
                             DispatchQueue.main.async {
                                 if let img = img {
                                     self.carPhoto = img
-                                    print("DEBUG: AddVehicleFlowView carPhoto set (type=\(type?.rawValue ?? "?")")
+                                    let t = type?.rawValue ?? "?"
+                                    print("DEBUG: AddVehicleFlowView carPhoto set (type=\(t))")
                                 } else {
                                     print("DEBUG: AddVehicleFlowView CarPhotoPicker returned nil")
                                 }
@@ -493,7 +498,7 @@ struct AddVehicleFlowView: View {
     }
 }
 
-struct TrailerFormView: View {
+private struct NewTrailerFormView: View {
     @Environment(\.dismiss) private var dismiss
     var onCreate: (Trailer) -> Void
 
@@ -502,6 +507,7 @@ struct TrailerFormView: View {
     @State private var plate = ""
     @State private var notes = ""
     @State private var showingPlateScanner = false
+    @State private var trailerPhoto: UIImage? = nil
 
     var body: some View {
         Form {
@@ -528,13 +534,37 @@ struct TrailerFormView: View {
 
                 TextField("Notes", text: $notes, axis: .vertical)
             }
+
+            Section(header: Text("Trailer Photo")) {
+                if let trailerPhoto {
+                    Image(uiImage: trailerPhoto)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 160)
+                        .clipped()
+                        .cornerRadius(12)
+                }
+                CarPhotoPickerView { img in
+                    DispatchQueue.main.async {
+                        self.trailerPhoto = img
+                    }
+                }
+                if trailerPhoto != nil {
+                    Button(role: .destructive) {
+                        trailerPhoto = nil
+                    } label: {
+                        Label("Remove Photo", systemImage: "trash")
+                    }
+                }
+            }
         }
         .navigationTitle("New Trailer")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    let t = Trailer(brandModel: brandModel, color: color, plate: plate, notes: notes, lastEdited: .now)
+                    let photoData = trailerPhoto?.jpegData(compressionQuality: 0.8)
+                    let t = Trailer(brandModel: brandModel, color: color, plate: plate, notes: notes, lastEdited: .now, photoData: photoData)
                     onCreate(t)
                     dismiss()
                 }
