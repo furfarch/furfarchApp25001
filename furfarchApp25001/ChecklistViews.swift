@@ -11,6 +11,7 @@ struct ChecklistListView: View {
     var body: some View {
         List {
             if checklists.isEmpty {
+                
                 ContentUnavailableView("No checklists", systemImage: "checklist", description: Text("Tap + to create a checklist from a template or blank."))
             } else {
                 ForEach(checklists) { cl in
@@ -87,6 +88,7 @@ struct CreateChecklistView: View {
                     df.dateStyle = .medium
                     df.timeStyle = .short
                     let finalTitle = df.string(from: .now)
+
                     let items = useTemplate ? ChecklistTemplates.items(for: selectedVehicle.type) : []
                     let new = Checklist(vehicleType: selectedVehicle.type, title: finalTitle, items: items, lastEdited: .now)
                     onCreate(new)
@@ -97,28 +99,29 @@ struct CreateChecklistView: View {
     }
 }
 
-#Preview { NavigationStack { ChecklistListView() } }
-
 // Checklist editor (moved here so all references compile)
 struct ChecklistEditorView: View {
     @Environment(\.modelContext) private var modelContext
-    @State var checklist: Checklist
+    @Bindable var checklist: Checklist
 
     var body: some View {
         List {
-            ForEach(Array(checklist.items.enumerated()), id: \.element.id) { idx, item in
+            ForEach(Array(checklist.items.enumerated()), id: \.element.id) { idx, _ in
                 HStack {
                     Button(action: {
                         let original = checklist.items[idx]
-                        var updated = original
-                        switch updated.state {
-                        case .notSelected: updated.state = .selected
-                        case .selected: updated.state = .notApplicable
-                        case .notApplicable: updated.state = .notSelected
-                        }
+                        let updated: ChecklistItem = {
+                            var v = original
+                            switch v.state {
+                            case .notSelected: v.state = .selected
+                            case .selected: v.state = .notApplicable
+                            case .notApplicable: v.state = .notSelected
+                            }
+                            return v
+                        }()
                         checklist.items[idx] = updated
                         checklist.lastEdited = .now
-                        try? modelContext.save()
+                        do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
                     }) {
                         Image(systemName: checklist.items[idx].state == .selected ? "checkmark.circle.fill" : (checklist.items[idx].state == .notApplicable ? "minus.circle" : "circle"))
                     }
@@ -130,17 +133,33 @@ struct ChecklistEditorView: View {
                     Button(action: {
                         // toggle a simple inline note for now
                         let original = checklist.items[idx]
-                        var updated = original
-                        if updated.note == nil { updated.note = "" }
-                        else if updated.note == "" { updated.note = "Add details…" }
-                        else { updated.note = nil }
+                        let updated: ChecklistItem = {
+                            var v = original
+                            if v.note == nil { v.note = "" }
+                            else if v.note == "" { v.note = "Add details…" }
+                            else { v.note = nil }
+                            return v
+                        }()
                         checklist.items[idx] = updated
-                        try? modelContext.save()
+                        checklist.lastEdited = .now
+                        do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
                     }) { Image(systemName: "ellipsis") }
                 }
             }
         }
         .navigationTitle(checklist.title)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") {
+                    checklist.lastEdited = .now
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        print("ERROR: failed saving checklist: \(error)")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -190,3 +209,5 @@ struct ChecklistItemRow: View {
         }
     }
 }
+
+#Preview { NavigationStack { ChecklistListView() } }
