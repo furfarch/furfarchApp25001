@@ -7,6 +7,7 @@ struct DriveLogListView: View {
     @Query(sort: \Vehicle.lastEdited, order: .reverse) private var vehicles: [Vehicle]
 
     @State private var showingNew = false
+    @State private var newLog: DriveLog? = nil
 
     var body: some View {
         List {
@@ -47,11 +48,22 @@ struct DriveLogListView: View {
             DriveLogEditorView(log: log)
         }
         .sheet(isPresented: $showingNew) {
-            if let firstVehicle = vehicles.first {
-                let newLog = DriveLog(vehicle: firstVehicle)
-                DriveLogEditorView(log: newLog, isNew: true)
+            if let newLog {
+                NavigationStack {
+                    DriveLogEditorView(log: newLog, isNew: true)
+                }
             } else {
                 Text("Please add a vehicle first.").padding()
+            }
+        }
+        .onChange(of: showingNew) { _, isPresented in
+            if isPresented {
+                guard newLog == nil, let firstVehicle = vehicles.first else { return }
+                let created = DriveLog(vehicle: firstVehicle)
+                context.insert(created)
+                newLog = created
+            } else {
+                newLog = nil
             }
         }
     }
@@ -120,7 +132,7 @@ struct DriveLogEditorView: View {
         }
         .navigationTitle(isNew ? "New Drive Log" : "Edit Drive Log")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { cancel() } }
             ToolbarItem(placement: .topBarTrailing) { Button("Save") { saveAndClose() }.bold() }
         }
         .sheet(isPresented: $showChecklistRunner) {
@@ -134,10 +146,18 @@ struct DriveLogEditorView: View {
         }
     }
 
+    private func cancel() {
+        if isNew {
+            context.delete(log)
+            try? context.save()
+        }
+        dismiss()
+    }
+
     private func saveAndClose() {
         log.lastEdited = .now
         if isNew { context.insert(log) }
-        try? context.save()
+        do { try context.save() } catch { print("ERROR: failed saving drive log: \(error)") }
         dismiss()
     }
 }

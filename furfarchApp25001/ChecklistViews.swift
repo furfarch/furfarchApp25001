@@ -55,48 +55,43 @@ struct ChecklistListView: View {
 
 struct CreateChecklistView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    /// Optional initial vehicle — if provided the checklist will be created for that vehicle's type.
-    var initialVehicle: Vehicle? = nil
     var onCreate: (Checklist) -> Void
 
     @Query(sort: \Vehicle.lastEdited, order: .reverse) private var vehicles: [Vehicle]
     @State private var selectedVehicle: Vehicle? = nil
-    @State private var title: String = ""
     @State private var useTemplate = true
 
     var body: some View {
         Form {
-            if let vehicle = initialVehicle {
-                Section("Vehicle") { Text(vehicle.brandModel.isEmpty ? vehicle.type.displayName : vehicle.brandModel) }
-            } else {
-                Section("Vehicle") {
-                    Picker("Select vehicle", selection: $selectedVehicle) {
-                        Text("Choose vehicle").tag(Vehicle?.none)
-                        ForEach(vehicles) { v in
-                            Text(v.brandModel.isEmpty ? v.type.displayName : v.brandModel).tag(Optional(v))
-                        }
+            Section("Vehicle") {
+                Picker("Vehicle", selection: $selectedVehicle) {
+                    Text("Select...").tag(Vehicle?.none)
+                    ForEach(vehicles) { v in
+                        Text(v.brandModel.isEmpty ? v.type.displayName : v.brandModel)
+                            .tag(Vehicle?.some(v))
                     }
                 }
             }
 
-            Section("Title") { TextField("Checklist title", text: $title) }
-
-            Section { Toggle("Pre-fill from template (if available)", isOn: $useTemplate) }
+            Section {
+                Toggle("Pre-fill from template (if available)", isOn: $useTemplate)
+            }
         }
         .navigationTitle("New Checklist")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Create") {
-                    let vehicleForType = initialVehicle ?? selectedVehicle
-                    guard let v = vehicleForType else { return }
-                    let vehicleType = v.type
-                    let finalTitle = title.isEmpty ? "\(vehicleType.displayName) checklist" : title
-                    let items = useTemplate ? ChecklistTemplates.items(for: vehicleType) : []
-                    let new = Checklist(vehicleType: vehicleType, title: finalTitle, items: items, lastEdited: .now)
+                    guard let selectedVehicle else { return }
+                    let df = DateFormatter()
+                    df.dateStyle = .medium
+                    df.timeStyle = .short
+                    let finalTitle = df.string(from: .now)
+                    let items = useTemplate ? ChecklistTemplates.items(for: selectedVehicle.type) : []
+                    let new = Checklist(vehicleType: selectedVehicle.type, title: finalTitle, items: items, lastEdited: .now)
                     onCreate(new)
                 }
+                .disabled(selectedVehicle == nil)
             }
         }
     }
@@ -115,7 +110,7 @@ struct ChecklistEditorView: View {
                 HStack {
                     Button(action: {
                         let original = checklist.items[idx]
-                        let updated = original
+                        var updated = original
                         switch updated.state {
                         case .notSelected: updated.state = .selected
                         case .selected: updated.state = .notApplicable
@@ -135,7 +130,7 @@ struct ChecklistEditorView: View {
                     Button(action: {
                         // toggle a simple inline note for now
                         let original = checklist.items[idx]
-                        let updated = original
+                        var updated = original
                         if updated.note == nil { updated.note = "" }
                         else if updated.note == "" { updated.note = "Add details…" }
                         else { updated.note = nil }
