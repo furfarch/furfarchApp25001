@@ -97,10 +97,10 @@ struct CreateChecklistView: View {
                     df.timeStyle = .short
                     let finalTitle = df.string(from: .now)
 
-                    // Always prefill based on the vehicle's type.
                     let items = ChecklistTemplates.items(for: selectedVehicle.type)
                     let new = Checklist(vehicleType: selectedVehicle.type, title: finalTitle, items: items, lastEdited: .now)
                     onCreate(new)
+                    dismiss() // important: close create sheet so we can open the editor immediately
                 }
                 .disabled(preselectedVehicle == nil && selectedVehicle == nil)
             }
@@ -116,46 +116,73 @@ struct CreateChecklistView: View {
 // Checklist editor (moved here so all references compile)
 struct ChecklistEditorView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Bindable var checklist: Checklist
+
+    private var groupedItemIndices: [(section: String, indices: [Int])] {
+        let pairs = checklist.items.enumerated().map { (idx: $0.offset, section: $0.element.section) }
+        let grouped = Dictionary(grouping: pairs, by: { $0.section })
+        // keep stable order by section name
+        return grouped
+            .map { (section: $0.key, indices: $0.value.map { $0.idx }.sorted()) }
+            .sorted { $0.section.localizedCaseInsensitiveCompare($1.section) == .orderedAscending }
+    }
 
     var body: some View {
         List {
-            ForEach(Array(checklist.items.enumerated()), id: \.element.id) { idx, _ in
-                HStack {
-                    Button(action: {
-                        let original = checklist.items[idx]
-                        var updated = original
-                        switch updated.state {
-                        case .notSelected: updated.state = .selected
-                        case .selected: updated.state = .notApplicable
-                        case .notApplicable: updated.state = .notSelected
+            ForEach(groupedItemIndices, id: \.section) { group in
+                Section(group.section) {
+                    ForEach(group.indices, id: \.self) { idx in
+                        HStack {
+                            Button(action: {
+                                let original = checklist.items[idx]
+                                var updated = original
+                                switch updated.state {
+                                case .notSelected: updated.state = .selected
+                                case .selected: updated.state = .notApplicable
+                                case .notApplicable: updated.state = .notSelected
+                                }
+                                checklist.items[idx] = updated
+                                checklist.lastEdited = .now
+                                do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
+                            }) {
+                                Image(systemName: checklist.items[idx].state == .selected ? "checkmark.circle.fill" : (checklist.items[idx].state == .notApplicable ? "minus.circle" : "circle"))
+                            }
+                            VStack(alignment: .leading) {
+                                Text(checklist.items[idx].title)
+                                if let note = checklist.items[idx].note {
+                                    Text(note).font(.footnote).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Button(action: {
+                                let original = checklist.items[idx]
+                                var updated = original
+                                if updated.note == nil { updated.note = "" }
+                                else if updated.note == "" { updated.note = "Add details…" }
+                                else { updated.note = nil }
+                                checklist.items[idx] = updated
+                                checklist.lastEdited = .now
+                                do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
+                            }) {
+                                Image(systemName: "ellipsis")
+                            }
                         }
-                        checklist.items[idx] = updated
-                        checklist.lastEdited = .now
-                        do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
-                    }) {
-                        Image(systemName: checklist.items[idx].state == .selected ? "checkmark.circle.fill" : (checklist.items[idx].state == .notApplicable ? "minus.circle" : "circle"))
                     }
-                    VStack(alignment: .leading) {
-                        Text(checklist.items[idx].title)
-                        if let note = checklist.items[idx].note { Text(note).font(.footnote).foregroundStyle(.secondary) }
-                    }
-                    Spacer()
-                    Button(action: {
-                        // toggle a simple inline note for now
-                        let original = checklist.items[idx]
-                        var updated = original
-                        if updated.note == nil { updated.note = "" }
-                        else if updated.note == "" { updated.note = "Add details…" }
-                        else { updated.note = nil }
-                        checklist.items[idx] = updated
-                        checklist.lastEdited = .now
-                        do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
-                    }) { Image(systemName: "ellipsis") }
                 }
             }
         }
         .navigationTitle(checklist.title)
+        .toolbar {
+            // Even though we save on each change, provide an explicit Save/Done for user expectation.
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    checklist.lastEdited = .now
+                    do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
+                    dismiss()
+                }
+            }
+        }
     }
 }
 

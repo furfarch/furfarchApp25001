@@ -6,10 +6,25 @@ struct VehiclesListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Vehicle.lastEdited, order: .reverse) private var vehicles: [Vehicle]
     @Query(sort: \Trailer.lastEdited, order: .reverse) private var trailers: [Trailer]
-    @State private var showingAbout = false
+
+    private func linkedVehicle(for trailer: Trailer) -> Vehicle? {
+        vehicles.first { $0.trailer?.id == trailer.id }
+    }
 
     var body: some View {
         List {
+            // Header row: plain text + icons (NOT a toolbar title)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) { Image(systemName: "car"); Text("Vehicles") }
+                HStack(spacing: 6) { Image(systemName: "road.lanes"); Text("Drive Log") }
+                HStack(spacing: 6) { Image(systemName: "checklist"); Text("Checklists") }
+            }
+            .font(.footnote)
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowSeparator(.hidden)
+
             // Flat list: no sections/grouping
             ForEach(trailers) { t in
                 HStack(spacing: 12) {
@@ -85,18 +100,6 @@ struct VehiclesListView: View {
         }
         .listStyle(.plain)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // About icon on the left
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showingAbout = true } label: {
-                    Image(systemName: "info.circle")
-                }
-                .accessibilityLabel("About")
-            }
-        }
-        .sheet(isPresented: $showingAbout) {
-            NavigationStack { AboutView().navigationTitle("About") }
-        }
     }
 }
 
@@ -198,8 +201,7 @@ struct VehicleFormView: View {
 
     private var logsForCurrentVehicle: [DriveLog] {
         guard let v = currentVehicle else { return [] }
-        // Avoid reading v.id (can crash on device/TestFlight due to SwiftData invalid backing data).
-        return allDriveLogs.filter { $0.vehicle === v }
+        return allDriveLogs.filter { $0.vehicle.id == v.id }
     }
 
     private var checklistsForCurrentVehicle: [Checklist] {
@@ -215,7 +217,7 @@ struct VehicleFormView: View {
                 if logsForCurrentVehicle.isEmpty {
                     Text("No drive logs yet").foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(logsForCurrentVehicle.prefix(3)), id: \.id) { log in
+                    ForEach(logsForCurrentVehicle.prefix(3)) { log in
                         NavigationLink {
                             DriveLogEditorView(log: log, isNew: false, lockVehicle: true)
                         } label: {
@@ -243,7 +245,7 @@ struct VehicleFormView: View {
                 if checklistsForCurrentVehicle.isEmpty {
                     Text("No checklists yet").foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(checklistsForCurrentVehicle.prefix(3)), id: \.id) { cl in
+                    ForEach(checklistsForCurrentVehicle.prefix(3)) { cl in
                         NavigationLink {
                             ChecklistEditorView(checklist: cl)
                         } label: {
