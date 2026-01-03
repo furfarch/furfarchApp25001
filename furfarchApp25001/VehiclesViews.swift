@@ -5,7 +5,6 @@ struct VehiclesListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Vehicle.lastEdited, order: .reverse) private var vehicles: [Vehicle]
     @Query(sort: \Trailer.lastEdited, order: .reverse) private var trailers: [Trailer]
-    @State private var showingAdd = false
 
     var body: some View {
         List {
@@ -68,19 +67,7 @@ struct VehiclesListView: View {
             }
         }
         .listStyle(.plain)
-        .navigationTitle("Vehicles")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingAdd = true } label: { Image(systemName: "plus") }
-                    .accessibilityLabel("Add Vehicle")
-            }
-        }
-        .sheet(isPresented: $showingAdd) {
-            NavigationStack {
-                AddVehicleFlowView()
-            }
-            .environment(\.modelContext, modelContext)
-        }
+        .navigationTitle("")
     }
 
     // New: a View that returns a composed icon (base + optional trailer overlay). Uses adaptive background for dark mode.
