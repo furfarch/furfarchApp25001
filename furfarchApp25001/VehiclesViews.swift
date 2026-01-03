@@ -149,6 +149,7 @@ struct VehicleFormView: View {
     // photo + scanner state
     @State private var carPhoto: UIImage? = nil
     @State private var showingPlateScanner = false
+    @State private var showingCarPhotoPicker = false
     @State private var saveErrorMessage: String? = nil
 
     @State private var showingNewDriveLog = false
@@ -182,8 +183,10 @@ struct VehicleFormView: View {
 
     private var logsForCurrentVehicle: [DriveLog] {
         guard let v = currentVehicle else { return [] }
-        // Compare by ID to avoid any unexpected object identity issues across contexts.
-        return allDriveLogs.filter { $0.vehicle.id == v.id }
+        // IMPORTANT: Avoid accessing v.id here.
+        // The TestFlight crash shows SwiftData asserting when reading Vehicle.id from invalid backing data.
+        // Comparing the object reference avoids hitting that persisted property during view updates.
+        return allDriveLogs.filter { $0.vehicle === v }
     }
 
     private var checklistsForCurrentVehicle: [Checklist] {
@@ -501,6 +504,7 @@ struct AddVehicleFlowView: View {
     // add photo + scanner states here as well
     @State private var carPhoto: UIImage? = nil
     @State private var showingPlateScanner = false
+    @State private var showingCarPhotoPicker = false
     @State private var saveErrorMessage: String? = nil
     @State private var justSaved = false
     @State private var savedAt: Date? = nil

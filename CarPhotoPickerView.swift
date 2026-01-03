@@ -3,11 +3,12 @@ import PhotosUI
 
 struct CarPhotoPickerView: View {
     var completion: (UIImage?) -> Void
+
     @State private var showingAction = false
     @State private var showingCamera = false
 
-    // Use PhotosPicker directly (this triggers permission prompts correctly on device)
-    @State private var showingPicker = false
+    // Use PhotosPicker directly (this reliably triggers the permission prompt on device)
+    @State private var showingLibraryPicker = false
     @State private var libraryItem: PhotosPickerItem? = nil
 
     var body: some View {
@@ -16,10 +17,10 @@ struct CarPhotoPickerView: View {
         }
         .confirmationDialog("Photo", isPresented: $showingAction, titleVisibility: .visible) {
             Button("Take Photo") { showingCamera = true }
-            Button("Choose From Library") { showingPicker = true }
+            Button("Choose From Library") { showingLibraryPicker = true }
             Button("Cancel", role: .cancel) { }
         }
-        .photosPicker(isPresented: $showingPicker, selection: $libraryItem, matching: .images)
+        .photosPicker(isPresented: $showingLibraryPicker, selection: $libraryItem, matching: .images)
         .onChange(of: libraryItem) { _, newItem in
             guard let item = newItem else { return }
             Task {
