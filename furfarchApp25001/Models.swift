@@ -123,12 +123,23 @@ final class Checklist {
     var items: [ChecklistItem]
     var lastEdited: Date
 
-    init(vehicleType: VehicleType, title: String, items: [ChecklistItem] = [], lastEdited: Date = .now) {
+    // New: checklist belongs to exactly one entity.
+    var vehicle: Vehicle?
+    var trailer: Trailer?
+
+    init(vehicleType: VehicleType,
+         title: String,
+         items: [ChecklistItem] = [],
+         lastEdited: Date = .now,
+         vehicle: Vehicle? = nil,
+         trailer: Trailer? = nil) {
         self.id = UUID()
         self.vehicleType = vehicleType
         self.title = title
         self.items = items
         self.lastEdited = lastEdited
+        self.vehicle = vehicle
+        self.trailer = trailer
     }
 }
 

@@ -251,7 +251,11 @@ struct VehicleFormView: View {
 
     private var checklistsForCurrentVehicle: [Checklist] {
         guard let v = currentVehicle else { return [] }
-        return allChecklists.filter { $0.vehicleType == v.type }
+        // Prefer new model: checklists belong to the specific vehicle.
+        let direct = allChecklists.filter { $0.vehicle === v }
+        if !direct.isEmpty { return direct }
+        // Backward compatibility: legacy (type-only) checklists.
+        return allChecklists.filter { $0.vehicle == nil && $0.trailer == nil && $0.vehicleType == v.type }
     }
 
     @ViewBuilder
@@ -295,6 +299,8 @@ struct VehicleFormView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(cl.title)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
                                 Text(cl.lastEdited, style: .date)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -306,12 +312,14 @@ struct VehicleFormView: View {
                 Button {
                     guard let vehicle else { return }
                     // Create checklist immediately from template and open editor.
-                    let df = DateFormatter()
-                    df.dateStyle = .medium
-                    df.timeStyle = .short
-                    let title = df.string(from: .now)
+                    let title = ChecklistTitle.make(for: vehicle.type, date: .now)
                     let items = ChecklistTemplates.items(for: vehicle.type)
-                    let new = Checklist(vehicleType: vehicle.type, title: title, items: items, lastEdited: .now)
+                    let new = Checklist(vehicleType: vehicle.type,
+                                        title: title,
+                                        items: items,
+                                        lastEdited: .now,
+                                        vehicle: vehicle)
+
                     modelContext.insert(new)
                     do { try modelContext.save() } catch { print("ERROR: failed saving new checklist: \(error)") }
                     newChecklistToEdit = new
@@ -531,6 +539,9 @@ private struct NewTrailerFormView: View {
     @State private var showingPlateScanner = false
     @State private var trailerPhoto: UIImage? = nil
 
+    @Query(sort: \Checklist.lastEdited, order: .reverse) private var allChecklists: [Checklist]
+    @State private var newChecklistToEdit: Checklist? = nil
+
     init(existing: Trailer? = nil, onCreate: ((Trailer) -> Void)? = nil) {
         self.existing = existing
         self.onCreate = onCreate
@@ -541,6 +552,14 @@ private struct NewTrailerFormView: View {
         if let data = existing?.photoData, let img = UIImage(data: data) {
             _trailerPhoto = State(initialValue: img)
         }
+    }
+
+    private var checklistsForTrailer: [Checklist] {
+        guard let existing else { return [] }
+        let direct = allChecklists.filter { $0.trailer === existing }
+        if !direct.isEmpty { return direct }
+        // Backward compatibility: legacy (type-only) checklists.
+        return allChecklists.filter { $0.vehicle == nil && $0.trailer == nil && $0.vehicleType == .trailer }
     }
 
     var body: some View {
@@ -580,6 +599,41 @@ private struct NewTrailerFormView: View {
             }
 
             if existing != nil {
+                Section("Checklists") {
+                    if checklistsForTrailer.isEmpty {
+                        Text("No checklists yet").foregroundStyle(.secondary)
+                    } else {
+                        ForEach(checklistsForTrailer.prefix(3)) { cl in
+                            NavigationLink {
+                                ChecklistEditorView(checklist: cl)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(cl.title)
+                                    Text(cl.lastEdited, style: .date)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    Button {
+                        guard let existing else { return }
+                        let title = ChecklistTitle.make(for: .trailer, date: .now)
+                        let items = ChecklistTemplates.items(for: .trailer)
+                        let new = Checklist(vehicleType: .trailer,
+                                            title: title,
+                                            items: items,
+                                            lastEdited: .now,
+                                            trailer: existing)
+                        modelContext.insert(new)
+                        try? modelContext.save()
+                        newChecklistToEdit = new
+                    } label: {
+                        Label("Add Checklist", systemImage: "plus")
+                    }
+                }
+
                 Section {
                     Button(role: .destructive) {
                         if let existing {
@@ -619,6 +673,12 @@ private struct NewTrailerFormView: View {
                     }
                 }
             }
+        }
+        .sheet(item: $newChecklistToEdit) { cl in
+            NavigationStack {
+                ChecklistEditorView(checklist: cl)
+            }
+            .environment(\.modelContext, modelContext)
         }
     }
 }
