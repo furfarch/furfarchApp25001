@@ -32,27 +32,32 @@ struct VehiclesListView: View {
 
             // Unlinked trailers (standalone)
             ForEach(unlinkedTrailers) { t in
-                HStack(spacing: 12) {
-                    Image("TRAILER_CAR")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .padding(4)
-                        .background(Color(.tertiarySystemBackground).opacity(0.85))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
-                            .font(.headline)
-                        if !t.plate.isEmpty {
-                            Text(t.plate)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                NavigationLink {
+                    NewTrailerFormView(existing: t)
+                        .environment(\.modelContext, modelContext)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image("TRAILER_CAR")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                            .padding(4)
+                            .background(Color(.tertiarySystemBackground).opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
+                                .font(.headline)
+                            if !t.plate.isEmpty {
+                                Text(t.plate)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        Spacer()
+                        Text(t.lastEdited, style: .time)
+                            .font(.footnote)
+                            .foregroundStyle(.tertiary)
                     }
-                    Spacer()
-                    Text(t.lastEdited, style: .time)
-                        .font(.footnote)
-                        .foregroundStyle(.tertiary)
                 }
                 .swipeActions {
                     Button(role: .destructive) {
@@ -106,28 +111,33 @@ struct VehiclesListView: View {
                 }
 
                 if let t = v.trailer {
-                    HStack(spacing: 12) {
-                        Image("TRAILER_CAR")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .padding(4)
-                            .background(Color(.tertiarySystemBackground).opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    NavigationLink {
+                        NewTrailerFormView(existing: t)
+                            .environment(\.modelContext, modelContext)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image("TRAILER_CAR")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
+                                .padding(4)
+                                .background(Color(.tertiarySystemBackground).opacity(0.85))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
-                                .font(.subheadline)
-                            if !t.plate.isEmpty {
-                                Text(t.plate)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
+                                    .font(.subheadline)
+                                if !t.plate.isEmpty {
+                                    Text(t.plate)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                        }
 
-                        Spacer()
+                            Spacer()
+                        }
+                        .padding(.leading, 40)
                     }
-                    .padding(.leading, 40)
                     .listRowSeparator(.hidden)
                 }
             }
@@ -505,95 +515,31 @@ struct VehicleFormView: View {
      }
 }
 
-struct TrailerPickerInline: View {
-    @Environment(\.modelContext) private var modelContext
-    @Binding var selection: Trailer?
 
-    // Existing trailers
-    @Query(sort: \Trailer.lastEdited, order: .reverse) private var trailers: [Trailer]
 
-    // Needed to enforce uniqueness: find which trailers are already linked.
-    @Query private var vehicles: [Vehicle]
-
-    @State private var showingNewTrailer = false
-    @State private var refreshID = UUID() // Force view refresh
-
-    private var trailersAlreadyLinked: Set<UUID> {
-        Set(vehicles.compactMap { $0.trailer?.id })
-    }
-
-    private var availableTrailers: [Trailer] {
-        // Allow selecting unlinked trailers + the currently selected one.
-        trailers.filter { t in
-            if selection?.id == t.id { return true }
-            return !trailersAlreadyLinked.contains(t.id)
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("Existing", selection: $selection) {
-                Text("None").tag(Trailer?.none)
-                ForEach(availableTrailers) { t in
-                    Text(t.brandModel.isEmpty ? (t.plate.isEmpty ? "Trailer" : t.plate) : t.brandModel)
-                        .tag(Trailer?.some(t))
-                }
-            }
-            .pickerStyle(.menu)
-
-            Button {
-                showingNewTrailer = true
-            } label: {
-                Label("Add New Trailer", systemImage: "plus.circle")
-            }
-            .sheet(isPresented: $showingNewTrailer) {
-                NavigationStack {
-                    TrailerFormView(trailer: nil) { newTrailer in
-                        modelContext.insert(newTrailer)
-                        selection = newTrailer
-                        do { try modelContext.save() } catch { print("ERROR: failed saving new trailer: \(error)") }
-                        refreshID = UUID()
-                        showingNewTrailer = false
-                    }
-                    .environment(\.modelContext, modelContext)
-                }
-            }
-        }
-        // Force Picker refresh when underlying data changes.
-        .id(refreshID)
-        .onChange(of: trailers.count) { _, _ in refreshID = UUID() }
-        .onChange(of: vehicles.count) { _, _ in refreshID = UUID() }
-        .onChange(of: (selection?.id)) { _, _ in refreshID = UUID() }
-    }
-}
-
-// Add a unified TrailerFormView (create+edit) and use it for the linked trailer rows and new trailer creation.
-private struct TrailerFormView: View {
+private struct NewTrailerFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    var trailer: Trailer? = nil
+    var existing: Trailer? = nil
     var onCreate: ((Trailer) -> Void)? = nil
 
     @State private var brandModel: String
     @State private var color: String
     @State private var plate: String
     @State private var notes: String
-
     @State private var showingPlateScanner = false
     @State private var trailerPhoto: UIImage? = nil
 
-    init(trailer: Trailer? = nil, onCreate: ((Trailer) -> Void)? = nil) {
-        self.trailer = trailer
+    init(existing: Trailer? = nil, onCreate: ((Trailer) -> Void)? = nil) {
+        self.existing = existing
         self.onCreate = onCreate
-        _brandModel = State(initialValue: trailer?.brandModel ?? "")
-        _color = State(initialValue: trailer?.color ?? "")
-        _plate = State(initialValue: trailer?.plate ?? "")
-        _notes = State(initialValue: trailer?.notes ?? "")
-        if let data = trailer?.photoData, let img = UIImage(data: data) {
+        _brandModel = State(initialValue: existing?.brandModel ?? "")
+        _color = State(initialValue: existing?.color ?? "")
+        _plate = State(initialValue: existing?.plate ?? "")
+        _notes = State(initialValue: existing?.notes ?? "")
+        if let data = existing?.photoData, let img = UIImage(data: data) {
             _trailerPhoto = State(initialValue: img)
-        } else {
-            _trailerPhoto = State(initialValue: nil)
         }
     }
 
@@ -633,11 +579,11 @@ private struct TrailerFormView: View {
                 }
             }
 
-            if trailer != nil {
+            if existing != nil {
                 Section {
                     Button(role: .destructive) {
-                        if let trailer {
-                            modelContext.delete(trailer)
+                        if let existing {
+                            modelContext.delete(existing)
                             try? modelContext.save()
                         }
                         dismiss()
@@ -647,19 +593,19 @@ private struct TrailerFormView: View {
                 }
             }
         }
-        .navigationTitle(trailer == nil ? "New Trailer" : "Edit Trailer")
+        .navigationTitle(existing == nil ? "New Trailer" : "Edit Trailer")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    if let trailer {
-                        trailer.brandModel = brandModel
-                        trailer.color = color
-                        trailer.plate = plate
-                        trailer.notes = notes
-                        trailer.lastEdited = .now
+                    if let existing {
+                        existing.brandModel = brandModel
+                        existing.color = color
+                        existing.plate = plate
+                        existing.notes = notes
+                        existing.lastEdited = .now
                         if let img = trailerPhoto, let data = img.jpegData(compressionQuality: 0.8) {
-                            trailer.photoData = data
+                            existing.photoData = data
                         }
                         try? modelContext.save()
                         dismiss()
@@ -672,7 +618,6 @@ private struct TrailerFormView: View {
                         dismiss()
                     }
                 }
-                .bold()
             }
         }
     }

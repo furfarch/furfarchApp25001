@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 /// Simple add-vehicle flow used by the main (+) button.
-/// This was referenced from SectionsView but missing from the target.
+/// Always creates a new vehicle (VehicleFormView(vehicle: nil)).
 struct AddVehicleFlowView: View {
     @Environment(\.dismiss) private var dismiss
 

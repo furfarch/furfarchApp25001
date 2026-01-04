@@ -27,17 +27,16 @@ struct SectionsView: View {
             VehiclesListView()
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // Left: About (restore)
+                    // Left: About
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showingAbout = true } label: { Image(systemName: "info.circle") }
                             .accessibilityLabel("About")
                     }
 
-                    // Right: Export, Add
+                    // Right: Export + Add
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button { showingExport = true } label: { Image(systemName: "square.and.arrow.up") }
                             .accessibilityLabel("Export")
-
                         Button { showingAddVehicle = true } label: { Image(systemName: "plus") }
                             .accessibilityLabel("Add Vehicle")
                     }

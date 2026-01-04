@@ -29,9 +29,9 @@ enum VehicleType: String, Codable, CaseIterable, Identifiable {
 
 enum ChecklistItemState: String, Codable, CaseIterable {
     case notSelected
-    case selected     // OK
-    case notApplicable // NA
-    case notOk        // Not OK
+    case selected
+    case notApplicable
+    case notOk
 
     mutating func cycle() {
         switch self {
@@ -52,7 +52,7 @@ final class Vehicle {
     var plate: String
     var notes: String
     var photoData: Data?
-    var trailer: Trailer?
+    @Relationship(inverse: \Trailer.linkedVehicle) var trailer: Trailer?
     var lastEdited: Date
 
     init(type: VehicleType, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = .now, photoData: Data? = nil) {
@@ -76,6 +76,7 @@ final class Trailer {
     var plate: String
     var notes: String
     var photoData: Data?
+    var linkedVehicle: Vehicle?
     var lastEdited: Date
 
     init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = .now, photoData: Data? = nil) {
