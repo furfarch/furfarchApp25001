@@ -114,131 +114,74 @@ struct CreateChecklistView: View {
     }
 }
 
-// Checklist editor (single implementation)
+// Checklist editor (moved here so all references compile)
 struct ChecklistEditorView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Bindable var checklist: Checklist
 
-    @State private var noteEditItemID: UUID? = nil
-    @State private var noteDraft: String = ""
-
-    private var grouped: [(section: String, indices: [Int])] {
-        var dict: [String: [Int]] = [:]
-        for (idx, item) in checklist.items.enumerated() {
-            dict[item.section, default: []].append(idx)
-        }
-        return dict.keys.sorted().map { (section: $0, indices: dict[$0] ?? []) }
-    }
-
-    private func stateSymbol(for state: ChecklistItemState) -> String {
-        switch state {
-        case .notSelected: return "circle"
-        case .selected: return "checkmark.circle.fill"
-        case .notApplicable: return "minus.circle"
-        case .notOk: return "xmark.octagon.fill"
-        }
-    }
-
-    private func cycleItem(at idx: Int) {
-        var updated = checklist.items[idx]
-        updated.state.cycle()
-        checklist.items[idx] = updated
-        checklist.lastEdited = .now
-        try? modelContext.save()
-    }
-
-    private func openNoteEditor(for idx: Int) {
-        let item = checklist.items[idx]
-        noteEditItemID = item.id
-        noteDraft = item.note ?? ""
-    }
-
-    private func saveNote() {
-        guard let id = noteEditItemID,
-              let idx = checklist.items.firstIndex(where: { $0.id == id }) else {
-            noteEditItemID = nil
-            noteDraft = ""
-            return
-        }
-
-        var updated = checklist.items[idx]
-        let trimmed = noteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        updated.note = trimmed.isEmpty ? nil : trimmed
-        checklist.items[idx] = updated
-        checklist.lastEdited = .now
-        try? modelContext.save()
-
-        noteEditItemID = nil
-        noteDraft = ""
-    }
+    // Clear references from drive logs before deleting the checklist.
+    @Query(sort: \DriveLog.date, order: .reverse) private var allDriveLogs: [DriveLog]
 
     var body: some View {
         List {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(checklist.title)
-                    .font(.subheadline)
-                    .lineLimit(2)
-                Text("Auto-saved")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .listRowSeparator(.hidden)
-
-            ForEach(grouped, id: \.section) { group in
-                Section(group.section) {
-                    ForEach(group.indices, id: \.self) { idx in
-                        HStack(spacing: 12) {
-                            Image(systemName: stateSymbol(for: checklist.items[idx].state))
-                                .imageScale(.large)
-                                .foregroundStyle(checklist.items[idx].state == .notOk ? .red : .primary)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(checklist.items[idx].title)
-                                if let note = checklist.items[idx].note, !note.isEmpty {
-                                    Text(note)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-
-                            Spacer()
-
-                            Button {
-                                openNoteEditor(for: idx)
-                            } label: {
-                                Image(systemName: "note.text")
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
+            ForEach(Array(checklist.items.enumerated()), id: \.element.id) { idx, _ in
+                HStack {
+                    Button(action: {
+                        let original = checklist.items[idx]
+                        var updated = original
+                        switch updated.state {
+                        case .notSelected: updated.state = .selected
+                        case .selected: updated.state = .notApplicable
+                        case .notApplicable: updated.state = .notOk
+                        case .notOk: updated.state = .notSelected
                         }
-                        .contentShape(Rectangle())
-                        .onTapGesture { cycleItem(at: idx) }
+                        checklist.items[idx] = updated
+                        checklist.lastEdited = .now
+                        do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
+                    }) {
+                        Image(systemName: checklist.items[idx].state == .selected ? "checkmark.circle.fill" : (checklist.items[idx].state == .notApplicable ? "minus.circle" : "circle"))
                     }
+                    VStack(alignment: .leading) {
+                        Text(checklist.items[idx].title)
+                        if let note = checklist.items[idx].note { Text(note).font(.footnote).foregroundStyle(.secondary) }
+                    }
+                    Spacer()
+                    Button(action: {
+                        // toggle a simple inline note for now
+                        let original = checklist.items[idx]
+                        var updated = original
+                        if updated.note == nil { updated.note = "" }
+                        else if updated.note == "" { updated.note = "Add details…" }
+                        else { updated.note = nil }
+                        checklist.items[idx] = updated
+                        checklist.lastEdited = .now
+                        do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
+                    }) { Image(systemName: "ellipsis") }
                 }
             }
         }
-        .navigationTitle("Checklist")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: Binding(get: { noteEditItemID != nil }, set: { if !$0 { noteEditItemID = nil } })) {
-            NavigationStack {
-                Form {
-                    Section("Note") {
-                        TextEditor(text: $noteDraft)
-                            .frame(minHeight: 140)
-                    }
-                }
-                .navigationTitle("Item Note")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { noteEditItemID = nil }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") { saveNote() }
-                    }
+        .navigationTitle(checklist.title)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(role: .destructive) {
+                    deleteChecklist()
+                } label: {
+                    Label("Delete", systemImage: "trash")
                 }
             }
         }
+    }
+
+    private func deleteChecklist() {
+        // Remove references from logs first so we don't keep dangling pointers.
+        for log in allDriveLogs where log.checklist === checklist {
+            log.checklist = nil
+        }
+
+        modelContext.delete(checklist)
+        do { try modelContext.save() } catch { print("ERROR: failed deleting checklist: \(error)") }
+        dismiss()
     }
 }
 

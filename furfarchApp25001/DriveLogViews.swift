@@ -89,11 +89,7 @@ struct DriveLogEditorView: View {
     @State private var createdChecklistToEdit: Checklist? = nil
 
     private var filteredChecklists: [Checklist] {
-        // Prefer new model: checklists belong to a specific vehicle instance.
-        let direct = allChecklists.filter { $0.vehicle === log.vehicle }
-        if !direct.isEmpty { return direct }
-        // Backward compatibility: legacy checklists (stored by type only).
-        return allChecklists.filter { $0.vehicle == nil && $0.trailer == nil && $0.vehicleType == log.vehicle.type }
+        allChecklists.filter { $0.vehicleType == log.vehicle.type }
     }
 
     var body: some View {
@@ -138,13 +134,12 @@ struct DriveLogEditorView: View {
                 }
 
                 Button {
-                    let title = ChecklistTitle.make(for: log.vehicle.type, date: .now)
+                    let df = DateFormatter()
+                    df.dateStyle = .medium
+                    df.timeStyle = .short
+                    let title = df.string(from: .now)
                     let items = ChecklistTemplates.items(for: log.vehicle.type)
-                    let new = Checklist(vehicleType: log.vehicle.type,
-                                        title: title,
-                                        items: items,
-                                        lastEdited: .now,
-                                        vehicle: log.vehicle)
+                    let new = Checklist(vehicleType: log.vehicle.type, title: title, items: items, lastEdited: .now)
                     context.insert(new)
                     try? context.save()
                     log.checklist = new
@@ -165,6 +160,17 @@ struct DriveLogEditorView: View {
         .navigationTitle(isNew ? "New Drive Log" : "Edit Drive Log")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { Button("Cancel") { cancel() } }
+
+            if !isNew {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        deleteLog()
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) { Button("Save") { saveAndClose() }.bold() }
         }
         .sheet(isPresented: $showChecklistRunner) {
@@ -193,8 +199,15 @@ struct DriveLogEditorView: View {
 
     private func saveAndClose() {
         log.lastEdited = .now
-        if isNew { context.insert(log) }
+        // NOTE: New logs are inserted when they are created (e.g. in DriveLogListView.onChange).
+        // Inserting again can cause duplicates.
         do { try context.save() } catch { print("ERROR: failed saving drive log: \(error)") }
+        dismiss()
+    }
+
+    private func deleteLog() {
+        context.delete(log)
+        do { try context.save() } catch { print("ERROR: failed deleting drive log: \(error)") }
         dismiss()
     }
 }
