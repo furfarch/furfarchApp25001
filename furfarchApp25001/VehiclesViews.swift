@@ -106,33 +106,28 @@ struct VehiclesListView: View {
                 }
 
                 if let t = v.trailer {
-                    NavigationLink {
-                        TrailerFormView(trailer: t)
-                            .environment(\.modelContext, modelContext)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image("TRAILER_CAR")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 22, height: 22)
-                                .padding(4)
-                                .background(Color(.tertiarySystemBackground).opacity(0.85))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                    HStack(spacing: 12) {
+                        Image("TRAILER_CAR")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .padding(4)
+                            .background(Color(.tertiarySystemBackground).opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
-                                    .font(.subheadline)
-                                if !t.plate.isEmpty {
-                                    Text(t.plate)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
+                                .font(.subheadline)
+                            if !t.plate.isEmpty {
+                                Text(t.plate)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-
-                            Spacer()
                         }
-                        .padding(.leading, 40)
+
+                        Spacer()
                     }
+                    .padding(.leading, 40)
                     .listRowSeparator(.hidden)
                 }
             }
@@ -564,12 +559,15 @@ struct TrailerPickerInline: View {
                 }
             }
         }
+        // Force Picker refresh when underlying data changes.
         .id(refreshID)
         .onChange(of: trailers.count) { _, _ in refreshID = UUID() }
         .onChange(of: vehicles.count) { _, _ in refreshID = UUID() }
+        .onChange(of: (selection?.id)) { _, _ in refreshID = UUID() }
     }
 }
 
+// Add a unified TrailerFormView (create+edit) and use it for the linked trailer rows and new trailer creation.
 private struct TrailerFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

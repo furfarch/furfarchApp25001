@@ -14,6 +14,9 @@ struct SectionsView: View {
     @State private var shareURL: URL? = nil
     @State private var showingShareSheet = false
 
+    @State private var isExporting = false
+    @State private var exportErrorMessage: String? = nil
+
     @Query(sort: \Vehicle.lastEdited, order: .reverse) private var vehicles: [Vehicle]
     @Query(sort: \Trailer.lastEdited, order: .reverse) private var trailers: [Trailer]
     @Query(sort: \DriveLog.date, order: .reverse) private var logs: [DriveLog]
@@ -24,13 +27,13 @@ struct SectionsView: View {
             VehiclesListView()
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // Left: About
+                    // Left: About (restore)
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showingAbout = true } label: { Image(systemName: "info.circle") }
                             .accessibilityLabel("About")
                     }
 
-                    // Right: Export + Add
+                    // Right: Export, Add
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button { showingExport = true } label: { Image(systemName: "square.and.arrow.up") }
                             .accessibilityLabel("Export")
@@ -65,35 +68,59 @@ struct SectionsView: View {
                                 .pickerStyle(.segmented)
                             }
 
+                            if isExporting {
+                                Section {
+                                    HStack(spacing: 12) {
+                                        ProgressView()
+                                        Text("Generating export…")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+
                             Section {
                                 Button {
-                                    do {
-                                        let (name, data) = try ExportService.exportData(
-                                            scope: exportScope,
-                                            format: exportFormat,
-                                            vehicles: vehicles,
-                                            trailers: trailers,
-                                            logs: logs,
-                                            checklists: checklists
-                                        )
+                                    guard !isExporting else { return }
+                                    isExporting = true
+                                    exportErrorMessage = nil
 
-                                        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-                                        try data.write(to: url, options: [.atomic])
-                                        shareURL = url
-                                        showingShareSheet = true
-                                    } catch {
-                                        print("ERROR: export failed: \(error)")
+                                    DispatchQueue.main.async {
+                                        do {
+                                            let (name, data) = try ExportService.exportData(
+                                                scope: exportScope,
+                                                format: exportFormat,
+                                                vehicles: vehicles,
+                                                trailers: trailers,
+                                                logs: logs,
+                                                checklists: checklists
+                                            )
+
+                                            let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+                                            try data.write(to: url, options: [.atomic])
+                                            shareURL = url
+                                            showingShareSheet = true
+                                        } catch {
+                                            exportErrorMessage = "Export failed: \(error.localizedDescription)"
+                                        }
+                                        isExporting = false
                                     }
                                 } label: {
-                                    Label("Generate Export", systemImage: "doc.badge.plus")
+                                    Label(isExporting ? "Generating…" : "Generate Export", systemImage: "doc.badge.plus")
                                 }
+                                .disabled(isExporting)
                             }
                         }
                         .navigationTitle("Export")
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("Close") { showingExport = false }
+                                    .disabled(isExporting)
                             }
+                        }
+                        .alert("Export", isPresented: Binding(get: { exportErrorMessage != nil }, set: { if !$0 { exportErrorMessage = nil } })) {
+                            Button("OK", role: .cancel) { exportErrorMessage = nil }
+                        } message: {
+                            Text(exportErrorMessage ?? "")
                         }
                     }
                 }
