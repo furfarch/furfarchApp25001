@@ -14,7 +14,9 @@ struct TrailerPickerInline: View {
 
     private var availableTrailers: [Trailer] {
         trailers.filter { t in
-            if selection === t { return true }
+            // Allow current selection even if linked (because it's linked to THIS vehicle).
+            if selection?.id == t.id { return true }
+            // Only allow trailers not linked to any vehicle.
             return t.linkedVehicle == nil
         }
     }

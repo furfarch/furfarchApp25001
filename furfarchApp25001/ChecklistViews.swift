@@ -114,26 +114,62 @@ struct CreateChecklistView: View {
     }
 }
 
-// Checklist editor (single source of truth)
+// Checklist editor (single implementation)
 struct ChecklistEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var checklist: Checklist
 
-    private var sectionedItems: [(String, [ChecklistItem])] {
-        let dict = Dictionary(grouping: checklist.items, by: { $0.section })
-        return dict.keys.sorted().map { ($0, dict[$0] ?? []) }
+    @State private var noteEditItemID: UUID? = nil
+    @State private var noteDraft: String = ""
+
+    private var grouped: [(section: String, indices: [Int])] {
+        var dict: [String: [Int]] = [:]
+        for (idx, item) in checklist.items.enumerated() {
+            dict[item.section, default: []].append(idx)
+        }
+        return dict.keys.sorted().map { (section: $0, indices: dict[$0] ?? []) }
     }
 
-    private func binding(for item: ChecklistItem) -> Binding<ChecklistItem> {
-        Binding(get: {
-            checklist.items.first(where: { $0.id == item.id }) ?? item
-        }, set: { updated in
-            if let idx = checklist.items.firstIndex(where: { $0.id == item.id }) {
-                checklist.items[idx] = updated
-                checklist.lastEdited = .now
-                try? modelContext.save()
-            }
-        })
+    private func stateSymbol(for state: ChecklistItemState) -> String {
+        switch state {
+        case .notSelected: return "circle"
+        case .selected: return "checkmark.circle.fill"
+        case .notApplicable: return "minus.circle"
+        case .notOk: return "xmark.octagon.fill"
+        }
+    }
+
+    private func cycleItem(at idx: Int) {
+        var updated = checklist.items[idx]
+        updated.state.cycle()
+        checklist.items[idx] = updated
+        checklist.lastEdited = .now
+        try? modelContext.save()
+    }
+
+    private func openNoteEditor(for idx: Int) {
+        let item = checklist.items[idx]
+        noteEditItemID = item.id
+        noteDraft = item.note ?? ""
+    }
+
+    private func saveNote() {
+        guard let id = noteEditItemID,
+              let idx = checklist.items.firstIndex(where: { $0.id == id }) else {
+            noteEditItemID = nil
+            noteDraft = ""
+            return
+        }
+
+        var updated = checklist.items[idx]
+        let trimmed = noteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.note = trimmed.isEmpty ? nil : trimmed
+        checklist.items[idx] = updated
+        checklist.lastEdited = .now
+        try? modelContext.save()
+
+        noteEditItemID = nil
+        noteDraft = ""
     }
 
     var body: some View {
@@ -149,16 +185,60 @@ struct ChecklistEditorView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .listRowSeparator(.hidden)
 
-            ForEach(sectionedItems, id: \.0) { section, items in
-                Section(section) {
-                    ForEach(items) { item in
-                        ChecklistItemRow(item: binding(for: item))
+            ForEach(grouped, id: \.section) { group in
+                Section(group.section) {
+                    ForEach(group.indices, id: \.self) { idx in
+                        HStack(spacing: 12) {
+                            Image(systemName: stateSymbol(for: checklist.items[idx].state))
+                                .imageScale(.large)
+                                .foregroundStyle(checklist.items[idx].state == .notOk ? .red : .primary)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(checklist.items[idx].title)
+                                if let note = checklist.items[idx].note, !note.isEmpty {
+                                    Text(note)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            Button {
+                                openNoteEditor(for: idx)
+                            } label: {
+                                Image(systemName: "note.text")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { cycleItem(at: idx) }
                     }
                 }
             }
         }
         .navigationTitle("Checklist")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: Binding(get: { noteEditItemID != nil }, set: { if !$0 { noteEditItemID = nil } })) {
+            NavigationStack {
+                Form {
+                    Section("Note") {
+                        TextEditor(text: $noteDraft)
+                            .frame(minHeight: 140)
+                    }
+                }
+                .navigationTitle("Item Note")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { noteEditItemID = nil }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { saveNote() }
+                    }
+                }
+            }
+        }
     }
 }
 
