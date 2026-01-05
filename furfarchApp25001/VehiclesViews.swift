@@ -239,6 +239,7 @@ struct VehicleFormView: View {
 
     @State private var showingNewDriveLog = false
     @State private var newChecklistToEdit: Checklist? = nil
+
     @State private var newDriveLogToEdit: DriveLog? = nil
 
     // Show last items for this vehicle
@@ -287,7 +288,11 @@ struct VehicleFormView: View {
 
     private var checklistsForCurrentVehicle: [Checklist] {
         guard let v = currentVehicle else { return [] }
-        return allChecklists.filter { $0.vehicle === v }
+        // Prefer new model: checklists belong to the specific vehicle.
+        let direct = allChecklists.filter { $0.vehicle === v }
+        if !direct.isEmpty { return direct }
+        // Backward compatibility: legacy (type-only) checklists.
+        return allChecklists.filter { $0.vehicle == nil && $0.trailer == nil && $0.vehicleType == v.type }
     }
 
     @ViewBuilder
@@ -302,7 +307,7 @@ struct VehicleFormView: View {
                             DriveLogEditorView(log: log, isNew: false, lockVehicle: true)
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(log.date, style: .date)
+                                Text(VehicleDriveLogTitleFormatter.title(for: log.date))
                                 if !log.reason.isEmpty {
                                     Text(log.reason).font(.footnote).foregroundStyle(.secondary)
                                 }
@@ -830,5 +835,15 @@ private struct NewTrailerFormView: View {
             }
             .environment(\.modelContext, modelContext)
         }
+    }
+}
+
+private enum VehicleDriveLogTitleFormatter {
+    static func title(for date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = .current
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return "Drive Log \(df.string(from: date))"
     }
 }

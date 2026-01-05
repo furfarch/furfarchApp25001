@@ -24,11 +24,12 @@ struct DriveLogListView: View {
                                     Text(plate).foregroundStyle(.secondary)
                                 }
                             }
-                            Text(log.date, style: .date)
+                            Text(DriveLogTitleFormatter.title(for: log.date))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             if !log.reason.isEmpty {
-                                Text(log.reason).lineLimit(1)
+                                Text(log.reason)
+                                    .lineLimit(1)
                                     .font(.subheadline)
                             }
                         }
@@ -200,17 +201,7 @@ struct DriveLogEditorView: View {
     private func saveAndClose() {
         log.lastEdited = .now
 
-        let trimmed = log.reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed == "Drive Log" {
-            let df = DateFormatter()
-            df.locale = Locale(identifier: "en_US_POSIX")
-            df.timeZone = .current
-            df.dateFormat = "yyyy-MM-dd HH:mm"
-            log.reason = "Drive Log \(df.string(from: log.date))"
-        }
-
-        // NOTE: New logs are inserted when they are created (e.g. in DriveLogListView.onChange).
-        // Inserting again can cause duplicates.
+        // Reason is a user note; do not overwrite it.
         do { try context.save() } catch { print("ERROR: failed saving drive log: \(error)") }
         dismiss()
     }
@@ -269,27 +260,28 @@ private struct ChecklistRunnerItemRow: View {
     @Binding var item: ChecklistItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                Button {
-                    item.state.cycle()
-                } label: {
-                    Image(systemName: symbolName(for: item.state))
-                }
-                .buttonStyle(.plain)
+        HStack(alignment: .top, spacing: 10) {
+            Button {
+                item.state.cycle()
+            } label: {
+                Image(systemName: symbolName(for: item.state))
+            }
+            .buttonStyle(.plain)
 
+            VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let note = item.note, !note.isEmpty {
-                    Image(systemName: "note.text")
+                    Text(note)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
 
+            Spacer(minLength: 0)
+
             if let note = item.note, !note.isEmpty {
-                Text(note)
-                    .font(.footnote)
+                Image(systemName: "note.text")
                     .foregroundStyle(.secondary)
             }
         }
@@ -302,6 +294,16 @@ private struct ChecklistRunnerItemRow: View {
         case .notApplicable: return "minus.circle"
         case .notOk: return "xmark.octagon.fill"
         }
+    }
+}
+
+private enum DriveLogTitleFormatter {
+    static func title(for date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = .current
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return "Drive Log \(df.string(from: date))"
     }
 }
 
