@@ -126,7 +126,6 @@ struct ChecklistEditorView: View {
     @Query(sort: \DriveLog.date, order: .reverse) private var allDriveLogs: [DriveLog]
 
     @State private var selectedSectionIndex: Int = 0
-    @State private var editingItemID: UUID? = nil
 
     private var orderedSections: [String] {
         let present = Set(checklist.items.map { $0.section })
@@ -145,7 +144,6 @@ struct ChecklistEditorView: View {
         guard let order = subsectionOrderBySection[section], !order.isEmpty else {
             return sectionItems.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         }
-        // Preserve template order by sorting by the title's index in the order list.
         return sectionItems.sorted { a, b in
             let ia = order.firstIndex(of: a.title) ?? Int.max
             let ib = order.firstIndex(of: b.title) ?? Int.max
@@ -154,11 +152,18 @@ struct ChecklistEditorView: View {
         }
     }
 
+    private func subsectionName(for item: ChecklistItem, in section: String) -> String? {
+        guard let order = subsectionOrderBySection[section], let idx = order.firstIndex(of: item.title) else { return nil }
+        let prior = order.prefix(idx)
+        // The template lists subsection labels as ALL CAPS; pick the most recent.
+        return prior.last(where: { $0.uppercased() == $0 })
+    }
+
     private func binding(for item: ChecklistItem) -> Binding<ChecklistItem> {
         Binding(get: {
             checklist.items.first(where: { $0.id == item.id }) ?? item
         }, set: { updated in
-            if let idx = checklist.items.firstIndex(where: { $0.id == item.id }) {
+            if let idx = checklist.items.firstIndex(where: { $0.id == updated.id }) {
                 checklist.items[idx] = updated
             }
         })
@@ -174,16 +179,8 @@ struct ChecklistEditorView: View {
                         ChecklistSectionCard(
                             title: section,
                             items: items(in: section),
+                            subsectionNameForItem: { item in subsectionName(for: item, in: section) },
                             bindingFor: binding(for:),
-                            subtitleForItem: { item in
-                                // Show which subsection header the item belongs to (based on template order).
-                                guard let order = subsectionOrderBySection[section], let idx = order.firstIndex(of: item.title) else { return nil }
-                                let prior = order.prefix(idx)
-                                return prior.last(where: { $0.uppercased() == $0 }) // heuristic: template subsection headers are uppercase
-                            },
-                            onEditNote: { item in
-                                editingItemID = item.id
-                            },
                             onChange: {
                                 checklist.lastEdited = .now
                                 do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
@@ -196,31 +193,8 @@ struct ChecklistEditorView: View {
                 .tabViewStyle(.page(indexDisplayMode: .automatic))
             }
         }
-        // avoid repeated title by only using navigation title
         .navigationTitle(checklist.title)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: Binding<ChecklistItem?>(
-            get: {
-                guard let id = editingItemID else { return nil }
-                return checklist.items.first(where: { $0.id == id })
-            },
-            set: { _ in
-                editingItemID = nil
-            }
-        )) { _ in
-            ChecklistNoteEditorSheet(
-                item: Binding(get: {
-                    checklist.items.first(where: { $0.id == editingItemID }) ?? ChecklistItem(section: "", title: "")
-                }, set: { updated in
-                    if let idx = checklist.items.firstIndex(where: { $0.id == updated.id }) {
-                        checklist.items[idx] = updated
-                        checklist.lastEdited = .now
-                        try? modelContext.save()
-                    }
-                })
-            )
-            .presentationDetents([.medium, .large])
-        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -258,14 +232,32 @@ struct ChecklistEditorView: View {
 private struct ChecklistSectionCard: View {
     let title: String
     let items: [ChecklistItem]
+    let subsectionNameForItem: (ChecklistItem) -> String?
     let bindingFor: (ChecklistItem) -> Binding<ChecklistItem>
-    let subtitleForItem: (ChecklistItem) -> String?
-    let onEditNote: (ChecklistItem) -> Void
     let onChange: () -> Void
+
+    private var grouped: [(subsection: String?, items: [ChecklistItem])] {
+        var result: [(String?, [ChecklistItem])] = []
+        var current: String? = nil
+        var bucket: [ChecklistItem] = []
+
+        for item in items {
+            let sub = subsectionNameForItem(item)
+            if sub != current {
+                if !bucket.isEmpty {
+                    result.append((current, bucket))
+                    bucket = []
+                }
+                current = sub
+            }
+            bucket.append(item)
+        }
+        if !bucket.isEmpty { result.append((current, bucket)) }
+        return result
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Title only once (card)
             Text(title)
                 .font(.title3)
                 .fontWeight(.semibold)
@@ -276,15 +268,19 @@ private struct ChecklistSectionCard: View {
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(items) { item in
-                            ChecklistCardItemRow(
-                                item: bindingFor(item),
-                                subtitle: subtitleForItem(item),
-                                onEditNote: { onEditNote(item) },
-                                onChange: onChange
-                            )
-                            .padding(.vertical, 2)
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
+                            if let subtitle = group.subsection {
+                                Text(subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.top, 4)
+                            }
+
+                            ForEach(group.items) { item in
+                                ChecklistCardItemRow(item: bindingFor(item), onChange: onChange)
+                                    .padding(.vertical, 2)
+                            }
                         }
                     }
                     .padding(.bottom, 20)
@@ -306,18 +302,10 @@ private struct ChecklistSectionCard: View {
 
 private struct ChecklistCardItemRow: View {
     @Binding var item: ChecklistItem
-    let subtitle: String?
-    let onEditNote: () -> Void
     let onChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             HStack(alignment: .top, spacing: 10) {
                 Button {
                     item.state.cycle()
@@ -332,15 +320,18 @@ private struct ChecklistCardItemRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button {
-                    onEditNote()
+                    // keep existing note toggle behavior
+                    if item.note == nil { item.note = "" }
+                    else if item.note == "" { item.note = "Add details…" }
+                    else { item.note = nil }
+                    onChange()
                 } label: {
-                    Image(systemName: item.note == nil || item.note == "" ? "note.text.badge.plus" : "note.text")
+                    Image(systemName: "ellipsis")
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Edit note")
             }
 
-            if let note = item.note, !note.isEmpty {
+            if let note = item.note {
                 Text(note)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -356,42 +347,6 @@ private struct ChecklistCardItemRow: View {
         case .notApplicable: return "minus.circle"
         case .notOk: return "xmark.octagon.fill"
         }
-    }
-}
-
-private struct ChecklistNoteEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var item: ChecklistItem
-
-    @State private var draft: String = ""
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Note") {
-                    TextField("Optional note", text: $draft, axis: .vertical)
-                        .lineLimit(3...12)
-                }
-            }
-            .navigationTitle("Note")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-                        item.note = trimmed.isEmpty ? nil : trimmed
-                        dismiss()
-                    } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save note")
-                }
-            }
-        }
-        .onAppear { draft = item.note ?? "" }
     }
 }
 
