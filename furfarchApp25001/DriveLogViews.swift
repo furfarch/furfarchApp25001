@@ -172,7 +172,14 @@ struct DriveLogEditorView: View {
                 }
             }
 
-            ToolbarItem(placement: .topBarTrailing) { Button("Save") { saveAndClose() }.bold() }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    saveAndClose()
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .accessibilityLabel("Save")
+            }
         }
         .sheet(isPresented: $showChecklistRunner) {
             if let cl = log.checklist {

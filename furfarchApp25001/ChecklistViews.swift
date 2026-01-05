@@ -331,11 +331,17 @@ private struct ChecklistCardItemRow: View {
                 .buttonStyle(.plain)
             }
 
-            if let note = item.note {
-                Text(note)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if let _ = item.note {
+                TextField("Notiz", text: Binding(
+                    get: { item.note ?? "" },
+                    set: { newValue in
+                        item.note = newValue
+                        onChange()
+                    }
+                ), axis: .vertical)
+                .font(.footnote)
+                .textFieldStyle(.plain)
+                .foregroundStyle(.secondary)
             }
         }
     }

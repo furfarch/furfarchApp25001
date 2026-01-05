@@ -180,6 +180,9 @@ extension VehiclesListView {
             // prefer asset if present
             base = Image("MOTORBIKE")
             needsTemplateTint = true
+        case .scooter:
+            base = Image("SCOOTER")
+            needsTemplateTint = true
         case .other:
             base = Image(systemName: "questionmark.circle")
             needsTemplateTint = false
@@ -399,8 +402,7 @@ struct VehicleFormView: View {
                         typeButton(.trailer, label: "Trailer", assetName: "TRAILER_CAR")
                         typeButton(.camper, label: "Camper", assetName: "CAMPER")
                         typeButton(.boat, label: "Boat", systemName: "sailboat")
-                        // Scooter shares the motorbike type in the current data model
-                        typeButton(.motorbike, label: "Scooter", systemName: "scooter", systemNameFallback: "bicycle")
+                        typeButton(.scooter, label: "Scooter", assetName: "SCOOTER")
                         typeButton(.motorbike, label: "Motorbike", assetName: "MOTORBIKE")
                         typeButton(.other, label: "Other", systemNameFallback: "questionmark.circle")
                     }

@@ -9,6 +9,7 @@ enum VehicleType: String, Codable, CaseIterable, Identifiable {
     case camper
     case boat
     case motorbike
+    case scooter
     case other
 
     var id: String { rawValue }
@@ -22,6 +23,7 @@ enum VehicleType: String, Codable, CaseIterable, Identifiable {
         case .camper: return "Camper"
         case .boat: return "Boat"
         case .motorbike: return "Motorbike"
+        case .scooter: return "Scooter"
         case .other: return "Other"
         }
     }
@@ -53,7 +55,6 @@ final class Vehicle {
     var notes: String
     var photoData: Data?
     @Relationship(inverse: \Trailer.linkedVehicle) var trailer: Trailer?
-    @Relationship(inverse: \Checklist.vehicle) var checklists: [Checklist] = []
     var lastEdited: Date
 
     init(type: VehicleType, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = .now, photoData: Data? = nil) {
@@ -78,7 +79,6 @@ final class Trailer {
     var notes: String
     var photoData: Data?
     var linkedVehicle: Vehicle?
-    @Relationship(inverse: \Checklist.trailer) var checklists: [Checklist] = []
     var lastEdited: Date
 
     init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = .now, photoData: Data? = nil) {
@@ -125,7 +125,7 @@ final class Checklist {
     var items: [ChecklistItem]
     var lastEdited: Date
 
-    // NEW: ownership (exactly one should be set in normal usage)
+    // Optional ownership (newer model). Some screens still fall back to type-only checklists.
     var vehicle: Vehicle?
     var trailer: Trailer?
 
@@ -134,7 +134,8 @@ final class Checklist {
          items: [ChecklistItem] = [],
          lastEdited: Date = .now,
          vehicle: Vehicle? = nil,
-         trailer: Trailer? = nil) {
+         trailer: Trailer? = nil)
+    {
         self.id = UUID()
         self.vehicleType = vehicleType
         self.title = title
