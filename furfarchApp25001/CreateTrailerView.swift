@@ -54,16 +54,19 @@ struct CreateTrailerView: View {
         }
         .navigationTitle("New Trailer")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
+            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     let t = Trailer(brandModel: brandModel, color: color, plate: plate, notes: notes, lastEdited: .now)
                     if let img = trailerPhoto, let data = img.jpegData(compressionQuality: 0.8) {
                         t.photoData = data
                     }
                     onCreate(t)
                     dismiss()
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
                 }
+                .accessibilityLabel("Save")
             }
         }
     }

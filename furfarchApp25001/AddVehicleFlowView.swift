@@ -1,6 +1,15 @@
 import SwiftUI
 import SwiftData
 
-// NOTE:
-// `AddVehicleFlowView` is implemented in `VehiclesViews.swift`.
-// This file intentionally contains no declarations to avoid duplicate type definitions.
+/// Simple add-vehicle flow used by the main (+) button.
+/// This was referenced from SectionsView but missing from the target.
+struct AddVehicleFlowView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VehicleFormView(vehicle: nil)
+                // Intentionally no extra toolbar items here; VehicleFormView provides Cancel.
+        }
+    }
+}

@@ -11,14 +11,27 @@ struct ChecklistListView: View {
     var body: some View {
         List {
             if checklists.isEmpty {
-                
-                ContentUnavailableView("No checklists", systemImage: "checklist", description: Text("Tap + to create a checklist from a template or blank."))
+                ContentUnavailableView("No checklists", systemImage: "checklist", description: Text("Tap + to create a checklist."))
             } else {
                 ForEach(checklists) { cl in
                     NavigationLink(destination: ChecklistEditorView(checklist: cl)) {
-                        VStack(alignment: .leading) {
-                            Text(cl.title).font(.headline)
-                            Text(cl.vehicleType.displayName).font(.caption).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(cl.title)
+                                .font(.headline)
+
+                            if let v = cl.vehicle {
+                                Text(v.brandModel.isEmpty ? v.type.displayName : v.brandModel)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if let t = cl.trailer {
+                                Text(t.brandModel.isEmpty ? "Trailer" : t.brandModel)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("Unassigned • \(cl.vehicleType.displayName)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -87,9 +100,9 @@ struct CreateChecklistView: View {
         }
         .navigationTitle("New Checklist")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Create") {
+            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     let effectiveVehicle = preselectedVehicle ?? selectedVehicle
                     guard let selectedVehicle = effectiveVehicle else { return }
                     let finalTitle = ChecklistTitle.make(for: selectedVehicle.type, date: .now)
@@ -102,7 +115,11 @@ struct CreateChecklistView: View {
                                         lastEdited: .now,
                                         vehicle: selectedVehicle)
                     onCreate(new)
+                    dismiss()
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
                 }
+                .accessibilityLabel("Save")
                 .disabled(preselectedVehicle == nil && selectedVehicle == nil)
             }
         }
@@ -120,7 +137,6 @@ struct ChecklistEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var checklist: Checklist
 
-    // Clear references from drive logs before deleting the checklist.
     @Query(sort: \DriveLog.date, order: .reverse) private var allDriveLogs: [DriveLog]
 
     var body: some View {
@@ -163,25 +179,36 @@ struct ChecklistEditorView: View {
         }
         .navigationTitle(checklist.title)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { dismiss() }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) {
-                    deleteChecklist()
+                    // Clear any log references first.
+                    for log in allDriveLogs where log.checklist === checklist {
+                        log.checklist = nil
+                    }
+                    modelContext.delete(checklist)
+                    do { try modelContext.save() } catch { print("ERROR: failed deleting checklist: \(error)") }
+                    dismiss()
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Image(systemName: "trash")
                 }
+                .accessibilityLabel("Delete")
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    checklist.lastEdited = .now
+                    do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
+                    dismiss()
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .accessibilityLabel("Save")
             }
         }
-    }
-
-    private func deleteChecklist() {
-        // Remove references from logs first so we don't keep dangling pointers.
-        for log in allDriveLogs where log.checklist === checklist {
-            log.checklist = nil
-        }
-
-        modelContext.delete(checklist)
-        do { try modelContext.save() } catch { print("ERROR: failed deleting checklist: \(error)") }
-        dismiss()
     }
 }
 

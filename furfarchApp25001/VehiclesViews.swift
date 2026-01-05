@@ -239,6 +239,7 @@ struct VehicleFormView: View {
 
     @State private var showingNewDriveLog = false
     @State private var newChecklistToEdit: Checklist? = nil
+    @State private var newDriveLogToEdit: DriveLog? = nil
 
     // Show last items for this vehicle
     @Query(sort: \DriveLog.date, order: .reverse) private var allDriveLogs: [DriveLog]
@@ -286,11 +287,7 @@ struct VehicleFormView: View {
 
     private var checklistsForCurrentVehicle: [Checklist] {
         guard let v = currentVehicle else { return [] }
-        // Prefer new model: checklists belong to the specific vehicle.
-        let direct = allChecklists.filter { $0.vehicle === v }
-        if !direct.isEmpty { return direct }
-        // Backward compatibility: legacy (type-only) checklists.
-        return allChecklists.filter { $0.vehicle == nil && $0.trailer == nil && $0.vehicleType == v.type }
+        return allChecklists.filter { $0.vehicle === v }
     }
 
     @ViewBuilder
@@ -501,10 +498,28 @@ struct VehicleFormView: View {
         }
         .navigationTitle(vehicle == nil ? "New Vehicle" : "Edit Vehicle")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
+            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+
             if let vehicle = vehicle {
-                ToolbarItem { Button(role: .destructive) { modelContext.delete(vehicle); try? modelContext.save(); dismiss() } label: { Label("Delete", systemImage: "trash") } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        modelContext.delete(vehicle)
+                        try? modelContext.save()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .accessibilityLabel("Delete")
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    save()
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .accessibilityLabel("Save")
             }
         }
         .alert("Save error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
@@ -512,18 +527,29 @@ struct VehicleFormView: View {
         } message: {
             Text(saveErrorMessage ?? "Unknown error")
         }
-        .sheet(item: $newChecklistToEdit) { cl in
+        .fullScreenCover(item: $newChecklistToEdit) { cl in
             NavigationStack {
                 ChecklistEditorView(checklist: cl)
             }
             .environment(\.modelContext, modelContext)
         }
-        .sheet(isPresented: $showingNewDriveLog) {
+        .fullScreenCover(isPresented: $showingNewDriveLog) {
             if let vehicle {
                 NavigationStack {
-                    DriveLogEditorView(log: DriveLog(vehicle: vehicle), isNew: true, lockVehicle: true)
+                    if newDriveLogToEdit == nil {
+                        ProgressView()
+                            .onAppear {
+                                let new = DriveLog(vehicle: vehicle)
+                                modelContext.insert(new)
+                                do { try modelContext.save() } catch { print("ERROR: failed inserting new drive log: \(error)") }
+                                newDriveLogToEdit = new
+                            }
+                    } else if let newDriveLogToEdit {
+                        DriveLogEditorView(log: newDriveLogToEdit, isNew: true, lockVehicle: true)
+                    }
                 }
                 .environment(\.modelContext, modelContext)
+                .onDisappear { newDriveLogToEdit = nil }
             }
         }
     }
@@ -630,7 +656,7 @@ struct TrailerPickerInline: View {
             } label: {
                 Label("Add New Trailer", systemImage: "plus.circle")
             }
-            .sheet(isPresented: $showingNewTrailer) {
+            .fullScreenCover(isPresented: $showingNewTrailer) {
                 NavigationStack {
                     NewTrailerFormView { newTrailer in
                         modelContext.insert(newTrailer)
@@ -644,209 +670,6 @@ struct TrailerPickerInline: View {
             }
         }
         .id(refreshID)
-    }
-}
-
-struct AddVehicleFlowView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var step: Int = 1
-    @State private var type: VehicleType? = nil
-    @State private var brandModel: String = ""
-    @State private var color: String = ""
-    @State private var plate: String = ""
-    @State private var notes: String = ""
-    @State private var trailer: Trailer? = nil
-
-    // add photo + scanner states here as well
-    @State private var carPhoto: UIImage? = nil
-    @State private var showingPlateScanner = false
-    @State private var showingCarPhotoPicker = false
-    @State private var saveErrorMessage: String? = nil
-    @State private var justSaved = false
-    @State private var savedAt: Date? = nil
-
-    // Break out the type selection row to keep the compiler happy.
-    private var typeSelectionRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                typeButton(.car, label: "Car", systemName: "car")
-                typeButton(.van, label: "Van", assetName: "VAN")
-                typeButton(.truck, label: "Truck", systemName: "truck.box")
-                typeButton(.trailer, label: "Trailer", assetName: "TRAILER_CAR")
-                typeButton(.camper, label: "Camper", assetName: "CAMPER")
-                typeButton(.boat, label: "Boat", systemName: "sailboat")
-                // Scooter shares the motorbike type in the current data model
-                typeButton(.motorbike, label: "Scooter", systemName: "scooter")
-                typeButton(.motorbike, label: "Motorbike", assetName: "MOTORBIKE")
-                typeButton(.other, label: "Other", systemName: "questionmark.circle")
-            }
-            .padding(.vertical, 4)
-            .frame(minHeight: 56)
-        }
-    }
-
-    var body: some View {
-        Group {
-            if step == 1 {
-                Form {
-                    Section("Select Type") {
-                        typeSelectionRow
-                    }
-                }
-                .navigationTitle("New Vehicle")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) { Button("Next") { step = 2 }.disabled(type == nil) }
-                }
-            } else {
-                Form {
-                    Section("Details") {
-                        TextField("Brand / Model", text: $brandModel)
-                        TextField("Color", text: $color)
-
-                        // Plate field with scan button
-                        HStack {
-                            TextField("Plate", text: $plate)
-                            Button {
-                                showingPlateScanner = true
-                            } label: { Image(systemName: "camera.viewfinder") }
-                            .buttonStyle(.bordered)
-                        }
-                        .sheet(isPresented: $showingPlateScanner) {
-                            PlateScannerView { recognized in
-                                self.plate = recognized
-                                showingPlateScanner = false
-                            }
-                        }
-
-                        TextField("Notes", text: $notes, axis: .vertical)
-                    }
-
-                    if justSaved {
-                        Section {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("Saved")
-                                Spacer()
-                                if let savedAt {
-                                    Text(savedAt, style: .time)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-
-                    // Car Photo area
-                    Section(header: Text("Car Photo")) {
-                        if let carPhoto {
-                            Image(uiImage: carPhoto)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 160)
-                                .clipped()
-                                .cornerRadius(12)
-                        }
-                        CarPhotoPickerView { img in
-                            DispatchQueue.main.async {
-                                if let img = img {
-                                    self.carPhoto = img
-                                    let t = type?.rawValue ?? "?"
-                                    print("DEBUG: AddVehicleFlowView carPhoto set (type=\(t))")
-                                } else {
-                                    print("DEBUG: AddVehicleFlowView CarPhotoPicker returned nil")
-                                }
-                            }
-                        }
-                    }
-
-                    // Trailer linking rules apply here too.
-                    if type == .car || type == .van || type == .truck || type == .camper || type == .other {
-                        Section("Trailer (Optional)") { TrailerPickerInline(selection: $trailer) }
-                    }
-                     Section(footer: Text("Last edited: \(Date(), style: .date) \(Date(), style: .time)")) { EmptyView() }
-                 }
-                 .navigationTitle("Vehicle Details")
-                 .toolbar {
-                     ToolbarItem(placement: .cancellationAction) { Button("Back") { step = 1 } }
-                     ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(type == nil) }
-                 }
-             }
-         }
-         .alert("Save error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
-             Button("OK", role: .cancel) { saveErrorMessage = nil }
-         } message: { Text(saveErrorMessage ?? "Unknown error") }
-    }
-
-    private func save() {
-        guard let type else { return }
-
-        // IMPORTANT: A trailer is its own model type (Trailer), not a Vehicle.
-        // If the user picked "Trailer" as the type, create a Trailer record instead of a Vehicle.
-        if type == .trailer {
-            let t = Trailer(brandModel: brandModel,
-                            color: color,
-                            plate: plate,
-                            notes: notes,
-                            lastEdited: .now)
-            if let img = carPhoto, let data = img.jpegData(compressionQuality: 0.8) {
-                t.photoData = data
-            }
-            modelContext.insert(t)
-            do {
-                try modelContext.save()
-                print("DEBUG: saved new trailer id=\(t.id) brandModel=\(t.brandModel)")
-                justSaved = true
-                savedAt = .now
-            } catch {
-                saveErrorMessage = "Failed to save new trailer: \(error)"
-                print(saveErrorMessage!)
-            }
-            return
-        }
-
-        // Enforce invalid trailer links defensively.
-        let finalTrailer: Trailer? = (type == .car || type == .van || type == .truck || type == .camper || type == .other) ? trailer : nil
-        let now = Date()
-        let new = Vehicle(type: type, brandModel: brandModel, color: color, plate: plate, notes: notes, trailer: finalTrailer, lastEdited: now)
-
-        // Maintain inverse relationship for newly created vehicle.
-        finalTrailer?.linkedVehicle = new
-
-        // attach photo data if available
-        if let img = carPhoto, let data = img.jpegData(compressionQuality: 0.8) {
-            new.photoData = data
-        }
-        modelContext.insert(new)
-        do {
-            try modelContext.save()
-            print("DEBUG: saved new vehicle id=\(new.id) type=\(new.type) brandModel=\(new.brandModel)")
-            justSaved = true
-            savedAt = .now
-        } catch {
-            saveErrorMessage = "Failed to save new vehicle: \(error)"
-            print(saveErrorMessage!)
-        }
-    }
-
-    private func typeButton(_ t: VehicleType, label: String, assetName: String? = nil, systemName: String? = nil) -> some View {
-        Button {
-            type = t
-            print("DEBUG: selected type=\(t)")
-        } label: {
-            VStack(spacing: 6) {
-                if let assetName { Image(assetName).resizable().scaledToFit().frame(width: 28, height: 28) }
-                else if let systemName { Image(systemName: systemName).resizable().scaledToFit().frame(width: 28, height: 28) }
-                Text(label).font(.caption)
-            }
-            .padding(8)
-            .background(type == t ? Color.accentColor.opacity(0.15) : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -881,10 +704,7 @@ private struct NewTrailerFormView: View {
 
     private var checklistsForTrailer: [Checklist] {
         guard let existing else { return [] }
-        let direct = allChecklists.filter { $0.trailer === existing }
-        if !direct.isEmpty { return direct }
-        // Backward compatibility: legacy (type-only) checklists.
-        return allChecklists.filter { $0.vehicle == nil && $0.trailer == nil && $0.vehicleType == .trailer }
+        return allChecklists.filter { $0.trailer === existing }
     }
 
     var body: some View {
@@ -958,25 +778,27 @@ private struct NewTrailerFormView: View {
                         Label("Add Checklist", systemImage: "plus")
                     }
                 }
-
-                Section {
-                    Button(role: .destructive) {
-                        if let existing {
-                            modelContext.delete(existing)
-                            try? modelContext.save()
-                        }
-                        dismiss()
-                    } label: {
-                        Label("Delete Trailer", systemImage: "trash")
-                    }
-                }
             }
         }
         .navigationTitle(existing == nil ? "New Trailer" : "Edit Trailer")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
+            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+
+            if let existing {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        modelContext.delete(existing)
+                        try? modelContext.save()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .accessibilityLabel("Delete")
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     if let existing {
                         existing.brandModel = brandModel
                         existing.color = color
@@ -996,10 +818,13 @@ private struct NewTrailerFormView: View {
                         onCreate?(t)
                         dismiss()
                     }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
                 }
+                .accessibilityLabel("Save")
             }
         }
-        .sheet(item: $newChecklistToEdit) { cl in
+        .fullScreenCover(item: $newChecklistToEdit) { cl in
             NavigationStack {
                 ChecklistEditorView(checklist: cl)
             }

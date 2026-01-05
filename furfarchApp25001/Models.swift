@@ -53,6 +53,7 @@ final class Vehicle {
     var notes: String
     var photoData: Data?
     @Relationship(inverse: \Trailer.linkedVehicle) var trailer: Trailer?
+    @Relationship(inverse: \Checklist.vehicle) var checklists: [Checklist] = []
     var lastEdited: Date
 
     init(type: VehicleType, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = .now, photoData: Data? = nil) {
@@ -77,6 +78,7 @@ final class Trailer {
     var notes: String
     var photoData: Data?
     var linkedVehicle: Vehicle?
+    @Relationship(inverse: \Checklist.trailer) var checklists: [Checklist] = []
     var lastEdited: Date
 
     init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = .now, photoData: Data? = nil) {
@@ -123,7 +125,7 @@ final class Checklist {
     var items: [ChecklistItem]
     var lastEdited: Date
 
-    // New: checklist belongs to exactly one entity.
+    // NEW: ownership (exactly one should be set in normal usage)
     var vehicle: Vehicle?
     var trailer: Trailer?
 

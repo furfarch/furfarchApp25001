@@ -89,7 +89,7 @@ struct DriveLogEditorView: View {
     @State private var createdChecklistToEdit: Checklist? = nil
 
     private var filteredChecklists: [Checklist] {
-        allChecklists.filter { $0.vehicleType == log.vehicle.type }
+        allChecklists.filter { $0.vehicle === log.vehicle }
     }
 
     var body: some View {
@@ -139,7 +139,7 @@ struct DriveLogEditorView: View {
                     df.timeStyle = .short
                     let title = df.string(from: .now)
                     let items = ChecklistTemplates.items(for: log.vehicle.type)
-                    let new = Checklist(vehicleType: log.vehicle.type, title: title, items: items, lastEdited: .now)
+                    let new = Checklist(vehicleType: log.vehicle.type, title: title, items: items, lastEdited: .now, vehicle: log.vehicle)
                     context.insert(new)
                     try? context.save()
                     log.checklist = new
@@ -229,7 +229,9 @@ struct ChecklistRunnerView: View {
             }
             .navigationTitle(checklist.title)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() }.bold() }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") { dismiss() }
+                }
             }
         }
     }
