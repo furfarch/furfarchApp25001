@@ -26,8 +26,16 @@ struct furfarchApp25001App: App {
             Checklist.self,
             ChecklistItem.self,
         ])
+        
+        // Configure ModelContainer with CloudKit sync
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .automatic
+        )
+        
         do {
-            return try ModelContainer(for: schema)
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
