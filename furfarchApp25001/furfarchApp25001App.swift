@@ -47,6 +47,8 @@ private struct StorageInitErrorView: View {
 struct furfarchApp25001App: App {
     private static let storageLocationKey = "storageLocation"
     private static let cloudContainerId = "iCloud.com.furfarch.MyDriverLog"
+    private static let localStoreFileName = "default.store"
+    private static let cloudStoreFileName = "cloud.store"
 
     private let container: ModelContainer?
     private let initErrorMessage: String?
@@ -69,7 +71,7 @@ struct furfarchApp25001App: App {
             // Explicitly set URL for local storage in application support directory
             let localConfig = ModelConfiguration(
                 schema: schema,
-                url: URL.applicationSupportDirectory.appending(path: "default.store"),
+                url: URL.applicationSupportDirectory.appending(path: Self.localStoreFileName),
                 cloudKitDatabase: .none
             )
             if let c = try? ModelContainer(for: schema, configurations: [localConfig]) {
@@ -82,7 +84,7 @@ struct furfarchApp25001App: App {
         if wantsICloud {
             let cloudConfig = ModelConfiguration(
                 schema: schema,
-                url: URL.applicationSupportDirectory.appending(path: "cloud.store"),
+                url: URL.applicationSupportDirectory.appending(path: Self.cloudStoreFileName),
                 cloudKitDatabase: .private(Self.cloudContainerId)
             )
             if let c = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
