@@ -66,16 +66,25 @@ struct furfarchApp25001App: App {
 
         // Helper to avoid duplicating fallback logic
         func makeLocalContainer() -> ModelContainer? {
-            let localConfig = ModelConfiguration(isStoredInMemoryOnly: false)
+            // Explicitly set URL for local storage in application support directory
+            let localConfig = ModelConfiguration(
+                schema: schema,
+                url: URL.applicationSupportDirectory.appending(path: "default.store"),
+                cloudKitDatabase: .none
+            )
             if let c = try? ModelContainer(for: schema, configurations: [localConfig]) {
                 return c
             }
-            let inMemoryConfig = ModelConfiguration(isStoredInMemoryOnly: true)
+            let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             return try? ModelContainer(for: schema, configurations: [inMemoryConfig])
         }
 
         if wantsICloud {
-            let cloudConfig = ModelConfiguration(cloudKitDatabase: .private(Self.cloudContainerId))
+            let cloudConfig = ModelConfiguration(
+                schema: schema,
+                url: URL.applicationSupportDirectory.appending(path: "cloud.store"),
+                cloudKitDatabase: .private(Self.cloudContainerId)
+            )
             if let c = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
                 self.container = c
                 self.initErrorMessage = nil
