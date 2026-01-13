@@ -14,10 +14,44 @@
 import SwiftUI
 import SwiftData
 
+private struct StorageInitErrorView: View {
+    let message: String
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Storage Error")
+                    .font(.title2)
+                    .bold()
+
+                Text("The app couldn’t start its database.")
+                    .foregroundStyle(.secondary)
+
+                Text(message)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .foregroundStyle(.secondary)
+
+                Text("You can usually fix this by using Settings → Reset Local Database, or by deleting the app from the simulator/device.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+            .padding()
+        }
+    }
+}
+
 @main
 struct furfarchApp25001App: App {
-    var sharedModelContainer: ModelContainer = {
-        // Register all @Model types so SwiftData knows about them
+    private static let storageLocationKey = "storageLocation"
+    private static let cloudContainerId = "iCloud.com.furfarch.MyDriverLog"
+
+    private let container: ModelContainer?
+    private let initErrorMessage: String?
+
+    init() {
         let schema = Schema([
             Item.self,
             Vehicle.self,
@@ -27,41 +61,54 @@ struct furfarchApp25001App: App {
             ChecklistItem.self,
         ])
 
-        // Prefer CloudKit sync, but fall back to local-only store if CloudKit init fails.
-        let cloudConfig = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .private("iCloud.com.furfarch.MyDriverLog")
-        )
+        let storageRaw = UserDefaults.standard.string(forKey: Self.storageLocationKey) ?? StorageLocation.local.rawValue
+        let wantsICloud = (storageRaw == StorageLocation.icloud.rawValue)
 
-        do {
-            return try ModelContainer(for: schema, configurations: [cloudConfig])
-        } catch {
-            // CloudKit-backed stores can fail to initialize (e.g. iCloud not available, container mismatch).
-            // Falling back keeps the app usable instead of crashing at launch.
-            print("WARNING: CloudKit ModelContainer init failed. Falling back to local store. Error: \(error)")
+        // Helper to avoid duplicating fallback logic
+        func makeLocalContainer() -> ModelContainer? {
+            let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            if let c = try? ModelContainer(for: schema, configurations: [localConfig]) {
+                return c
+            }
+            let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try? ModelContainer(for: schema, configurations: [inMemoryConfig])
+        }
 
-            let localConfig = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false
-            )
-
-            do {
-                return try ModelContainer(for: schema, configurations: [localConfig])
-            } catch {
-                fatalError("Could not create ModelContainer: \(error)")
+        if wantsICloud {
+            let cloudConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .private(Self.cloudContainerId))
+            if let c = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+                self.container = c
+                self.initErrorMessage = nil
+            } else if let local = makeLocalContainer() {
+                self.container = local
+                self.initErrorMessage = "iCloud storage was selected but couldn’t be opened. Using local storage instead."
+            } else {
+                self.container = nil
+                self.initErrorMessage = "Could not open iCloud store, local store, or in-memory store."
+            }
+        } else {
+            if let local = makeLocalContainer() {
+                self.container = local
+                self.initErrorMessage = nil
+            } else {
+                self.container = nil
+                self.initErrorMessage = "Could not open local store or in-memory store."
             }
         }
-    }()
 
-    init() {
-        ChecklistOwnershipMigration.runIfNeeded(using: sharedModelContainer)
+        if let container {
+            ChecklistOwnershipMigration.runIfNeeded(using: container)
+        }
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if let container {
+                ContentView()
+                    .modelContainer(container)
+            } else {
+                StorageInitErrorView(message: initErrorMessage ?? "Unknown error")
+            }
         }
-        .modelContainer(sharedModelContainer)
     }
 }

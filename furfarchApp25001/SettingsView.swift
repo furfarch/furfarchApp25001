@@ -58,16 +58,31 @@ final class CloudStatusViewModel: ObservableObject {
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
+    let startExportFlow: () -> Void
+    let startImportFlow: () -> Void
+
     // Default local.
     @AppStorage("storageLocation") private var storageLocationRaw: String = StorageLocation.local.rawValue
 
     @StateObject private var cloudStatus = CloudStatusViewModel()
+
     @State private var showRestartHint = false
+    @State private var showICloudUnavailableAlert = false
+
+    @State private var showResetConfirm = false
+    @State private var showResetFailed = false
+    @State private var resetFailedMessage: String = ""
 
     private var selectionBinding: Binding<StorageLocation> {
         Binding(
             get: { StorageLocation(rawValue: storageLocationRaw) ?? .local },
             set: { newValue in
+                if newValue == .icloud, !cloudStatus.isICloudAvailable {
+                    storageLocationRaw = StorageLocation.local.rawValue
+                    showICloudUnavailableAlert = true
+                    return
+                }
+
                 storageLocationRaw = newValue.rawValue
                 // Switching stores requires app restart because ModelContainer is created at launch.
                 showRestartHint = true
@@ -77,6 +92,22 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Import / Export") {
+                Button {
+                    dismiss()
+                    startExportFlow()
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+
+                Button {
+                    dismiss()
+                    startImportFlow()
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                }
+            }
+
             Section("Storage") {
                 Picker("Storage location", selection: selectionBinding) {
                     ForEach(StorageLocation.allCases) { choice in
@@ -103,6 +134,18 @@ struct SettingsView: View {
             }
 
             Section {
+                Button(role: .destructive) {
+                    showResetConfirm = true
+                } label: {
+                    Label("Reset Local Database", systemImage: "trash")
+                }
+
+                Text("This deletes the local database on this device. The app will close and needs to be reopened.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Button("Close") { dismiss() }
             }
         }
@@ -112,6 +155,34 @@ struct SettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("To fully switch storage location, close and re-open the app.")
+        }
+        .alert("iCloud unavailable", isPresented: $showICloudUnavailableAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("iCloud isn’t available on this device/account right now. The app will keep using local storage.")
+        }
+        .confirmationDialog(
+            "Reset local database?",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive) {
+                do {
+                    try DatabaseResetService.resetApplicationSupport()
+                    DatabaseResetService.terminateForRelaunch()
+                } catch {
+                    resetFailedMessage = error.localizedDescription
+                    showResetFailed = true
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes ALL locally stored vehicles, trailers, checklists, and drive logs on this device. It won’t delete iCloud data.")
+        }
+        .alert("Reset failed", isPresented: $showResetFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(resetFailedMessage)
         }
     }
 }

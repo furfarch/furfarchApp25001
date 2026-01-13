@@ -6,8 +6,9 @@ struct SectionsView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var showingAbout = false
-    @State private var showingSettings = false
     @State private var showingAddVehicle = false
+
+    @State private var showingSettings = false
 
     @State private var showingExport = false
     @State private var exportScope: ExportScope = .all
@@ -30,23 +31,19 @@ struct SectionsView: View {
             VehiclesListView()
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // About + Settings should be the upper-left items.
-                    ToolbarItemGroup(placement: .topBarLeading) {
+                    // About should be the upper-left item.
+                    ToolbarItem(placement: .topBarLeading) {
                         Button { showingAbout = true } label: { Image(systemName: "info.circle") }
                             .accessibilityLabel("About")
+                    }
 
+                    ToolbarItem(placement: .topBarLeading) {
                         Button { showingSettings = true } label: { Image(systemName: "gearshape") }
                             .accessibilityLabel("Settings")
                     }
 
                     // Upper-right: only export/import and +
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button { showingExport = true } label: { Image(systemName: "square.and.arrow.up") }
-                            .accessibilityLabel("Export")
-
-                        Button { showingImportPicker = true } label: { Image(systemName: "square.and.arrow.down") }
-                            .accessibilityLabel("Import")
-
                         Button { showingAddVehicle = true } label: { Image(systemName: "plus") }
                             .accessibilityLabel("Add Vehicle")
                     }
@@ -55,7 +52,13 @@ struct SectionsView: View {
                     NavigationStack { AboutView().navigationTitle("About") }
                 }
                 .sheet(isPresented: $showingSettings) {
-                    NavigationStack { SettingsView() }
+                    NavigationStack {
+                        SettingsView(
+                            startExportFlow: { showingExport = true },
+                            startImportFlow: { showingImportPicker = true }
+                        )
+                        .navigationTitle("Settings")
+                    }
                 }
                 .sheet(isPresented: $showingAddVehicle) {
                     NavigationStack { AddVehicleFlowView() }

@@ -63,7 +63,7 @@ final class Vehicle {
 
     var lastEdited: Date
 
-    init(type: VehicleType, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = .now, photoData: Data? = nil) {
+    init(type: VehicleType, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = Date.now, photoData: Data? = nil) {
         self.id = UUID()
         self.type = type
         self.brandModel = brandModel
@@ -92,7 +92,7 @@ final class Trailer {
 
     var lastEdited: Date
 
-    init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = .now, photoData: Data? = nil) {
+    init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = Date.now, photoData: Data? = nil) {
         self.id = UUID()
         self.brandModel = brandModel
         self.color = color
@@ -121,7 +121,7 @@ final class DriveLog {
 
     var lastEdited: Date
 
-    init(vehicle: Vehicle?, date: Date = .now, reason: String = "", kmStart: Int = 0, kmEnd: Int = 0, notes: String = "", checklist: Checklist? = nil, lastEdited: Date = .now) {
+    init(vehicle: Vehicle?, date: Date = Date.now, reason: String = "", kmStart: Int = 0, kmEnd: Int = 0, notes: String = "", checklist: Checklist? = nil, lastEdited: Date = Date.now) {
         self.id = UUID()
         self.vehicle = vehicle
         self.date = date
@@ -153,7 +153,7 @@ final class Checklist {
     init(vehicleType: VehicleType,
          title: String,
          items: [ChecklistItem] = [],
-         lastEdited: Date = .now,
+         lastEdited: Date = Date.now,
          vehicle: Vehicle? = nil,
          trailer: Trailer? = nil)
     {
