@@ -88,7 +88,7 @@ struct CreateChecklistView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                Button("Create") {
                     let effectiveVehicle = preselectedVehicle ?? selectedVehicle
                     guard let selectedVehicle = effectiveVehicle else { return }
                     let finalTitle = ChecklistTitle.make(for: selectedVehicle.type, date: .now)
@@ -102,10 +102,7 @@ struct CreateChecklistView: View {
                                         vehicle: selectedVehicle)
                     onCreate(new)
                     dismiss()
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
                 }
-                .accessibilityLabel("Save")
                 .disabled(preselectedVehicle == nil && selectedVehicle == nil)
             }
         }
@@ -216,14 +213,11 @@ struct ChecklistEditorView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                Button("Save") {
                     checklist.lastEdited = .now
                     do { try modelContext.save() } catch { print("ERROR: failed saving checklist: \(error)") }
                     dismiss()
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
                 }
-                .accessibilityLabel("Save")
             }
         }
     }

@@ -176,12 +176,9 @@ struct DriveLogEditorView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                Button("Save") {
                     saveAndClose()
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
                 }
-                .accessibilityLabel("Save")
             }
         }
         .sheet(isPresented: $showChecklistRunner) {

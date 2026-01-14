@@ -521,12 +521,9 @@ struct VehicleFormView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                Button("Save") {
                     save()
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
                 }
-                .accessibilityLabel("Save")
             }
         }
         .alert("Save error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
@@ -805,7 +802,7 @@ private struct NewTrailerFormView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                Button("Save") {
                     if let existing {
                         existing.brandModel = brandModel
                         existing.color = color
@@ -825,10 +822,7 @@ private struct NewTrailerFormView: View {
                         onCreate?(t)
                         dismiss()
                     }
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
                 }
-                .accessibilityLabel("Save")
             }
         }
         .fullScreenCover(item: $newChecklistToEdit) { cl in

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AboutView: View {
+    @Environment(\.dismiss) private var dismiss
+    
     private var yearMonth: String {
         let now = Date()
         let formatter = DateFormatter()
@@ -41,6 +43,11 @@ struct AboutView: View {
                 Spacer(minLength: 0)
             }
             .padding()
+        }
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+            }
         }
     }
 }
