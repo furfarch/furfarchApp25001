@@ -154,7 +154,7 @@ struct SettingsView: View {
         .alert("Restart required", isPresented: $showRestartHint) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("To fully switch storage location, close and re-open the app.")
+            Text("To fully switch storage location, close and re-open the app. Your existing data will be available in the new storage mode.")
         }
         .alert("iCloud unavailable", isPresented: $showICloudUnavailableAlert) {
             Button("OK", role: .cancel) {}
