@@ -8,6 +8,14 @@ struct AboutView: View {
         return formatter.string(from: now)
     }
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -17,6 +25,10 @@ struct AboutView: View {
 
                 Text("\(yearMonth) • Personal Vehicle and Drive Log")
                     .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Text("Version \(appVersion) (\(buildNumber))")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
 
                 Divider()
