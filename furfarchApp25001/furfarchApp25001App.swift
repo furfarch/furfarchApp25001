@@ -1,6 +1,6 @@
 //
-//  SimplyDriveApp.swift
-//  SimplyDrive
+//  PurusDriveApp.swift
+//  Purus Drive
 //
 //  Created by Chris Furfari on 27.12.2025.
 //
@@ -8,7 +8,7 @@
 /*
  App Display Name:
  Set in target -> Info (or Info.plist) as CFBundleDisplayName to:
- "Simply Drive"
+ "Purus Drive"
 */
 
 import SwiftUI
@@ -44,9 +44,9 @@ private struct StorageInitErrorView: View {
 }
 
 @main
-struct SimplyDriveApp: App {
+struct PurusDriveApp: App {
     private static let storageLocationKey = "storageLocation"
-    private static let cloudContainerId = "iCloud.com.simply.drive"
+    private static let cloudContainerId = "iCloud.com.purus.driver"
     private static let localStoreFileName = "default.store"
     private static let cloudStoreFileName = "cloud.store"
 

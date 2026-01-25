@@ -1,2 +1,2 @@
-app_identifier("com.simply.drive.app") # bundle identifier
+app_identifier("com.purus.driver") # bundle identifier
 apple_id("") # your Apple ID (optional)

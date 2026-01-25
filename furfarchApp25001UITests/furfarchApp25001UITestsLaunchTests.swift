@@ -1,13 +1,13 @@
 //
-//  SimplyDriveUITestsLaunchTests.swift
-//  SimplyDriveUITests
+//  PurusDriveUITestsLaunchTests.swift
+//  PurusDriveUITests
 //
 //  Created by Chris Furfari on 27.12.2025.
 //
 
 import XCTest
 
-final class SimplyDriveUITestsLaunchTests: XCTestCase {
+final class PurusDriveUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
