@@ -12,7 +12,7 @@ struct AboutView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
 
-                Text("Simply Drive")
+                Text("Purus Drive")
                     .font(.headline)
 
                 Text("\(yearMonth) • Personal Vehicle and Drive Log")
