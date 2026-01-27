@@ -6,6 +6,7 @@ import UIKit
 /// Edit flow remains in VehiclesViews.swift via the existing `NewTrailerFormView(existing:)`.
 struct CreateTrailerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
     var onCreate: (Trailer) -> Void
 
@@ -54,16 +55,20 @@ struct CreateTrailerView: View {
         }
         .navigationTitle("New Trailer")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel", role: .cancel) { dismiss() }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
                     let t = Trailer(brandModel: brandModel, color: color, plate: plate, notes: notes, lastEdited: .now)
                     if let img = trailerPhoto, let data = img.jpegData(compressionQuality: 0.8) {
                         t.photoData = data
                     }
+                    // Make the new trailer a managed object so it can be linked to Vehicles
+                    modelContext.insert(t)
                     onCreate(t)
                     dismiss()
-                } label: {
+                }) {
                     Image(systemName: "square.and.arrow.down")
                 }
                 .accessibilityLabel("Save")

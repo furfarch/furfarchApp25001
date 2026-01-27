@@ -34,7 +34,11 @@ struct ChecklistListView: View {
             NavigationStack {
                 CreateChecklistView { new in
                     modelContext.insert(new)
-                    try? modelContext.save()
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        print("ERROR: failed saving new checklist: \(error)")
+                    }
                     showingCreate = false
                     // open editor for created checklist
                     editChecklist = new

@@ -565,6 +565,19 @@ struct VehicleFormView: View {
         let now = Date()
         do {
             if let vehicle = editableVehicle {
+                // Resolve the selected trailer to a managed instance in this context.
+                var managedTrailer: Trailer? = nil
+                if let sel = trailer {
+                    let selId = sel.id
+                    if let fetched = try? modelContext.fetch(FetchDescriptor<Trailer>(predicate: #Predicate { $0.id == selId })).first {
+                        managedTrailer = fetched
+                    } else {
+                        // Insert the instance so it becomes managed in this context
+                        modelContext.insert(sel)
+                        managedTrailer = sel
+                    }
+                }
+
                 let previousTrailer = vehicle.trailer
 
                 vehicle.type = type
@@ -572,22 +585,34 @@ struct VehicleFormView: View {
                 vehicle.color = color
                 vehicle.plate = plate
                 vehicle.notes = notes
-                vehicle.trailer = trailer
+                vehicle.trailer = managedTrailer
                 vehicle.lastEdited = now
 
-                if previousTrailer !== trailer {
+                if previousTrailer !== managedTrailer {
                     previousTrailer?.linkedVehicle = nil
                 }
-                trailer?.linkedVehicle = vehicle
+                managedTrailer?.linkedVehicle = vehicle
 
                 if let img = carPhoto, let data = img.jpegData(compressionQuality: 0.8) {
                     vehicle.photoData = data
                 }
                 try modelContext.save()
             } else {
-                let new = Vehicle(type: type, brandModel: brandModel, color: color, plate: plate, notes: notes, trailer: trailer, lastEdited: now)
+                // Resolve selected trailer to managed instance for the new vehicle
+                var managedTrailer: Trailer? = nil
+                if let sel = trailer {
+                    let selId = sel.id
+                    if let fetched = try? modelContext.fetch(FetchDescriptor<Trailer>(predicate: #Predicate { $0.id == selId })).first {
+                        managedTrailer = fetched
+                    } else {
+                        modelContext.insert(sel)
+                        managedTrailer = sel
+                    }
+                }
 
-                trailer?.linkedVehicle = new
+                let new = Vehicle(type: type, brandModel: brandModel, color: color, plate: plate, notes: notes, trailer: managedTrailer, lastEdited: now)
+
+                managedTrailer?.linkedVehicle = new
 
                 if let img = carPhoto, let data = img.jpegData(compressionQuality: 0.8) {
                     new.photoData = data
@@ -595,12 +620,13 @@ struct VehicleFormView: View {
                 modelContext.insert(new)
                 try modelContext.save()
             }
-            dismiss()
-        } catch {
-            saveErrorMessage = "Failed to save vehicle: \(error)"
-            print(saveErrorMessage!)
-        }
-    }
+         
+             dismiss()
+         } catch {
+             saveErrorMessage = "Failed to save vehicle: \(error)"
+             print(saveErrorMessage!)
+         }
+     }
 
     private func typeButton(_ t: VehicleType, label: String, assetName: String? = nil, systemName: String? = nil, systemNameFallback: String? = nil) -> some View {
         Button {
