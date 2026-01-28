@@ -56,7 +56,6 @@ struct PurusDriveApp: App {
 
     init() {
         let schema = Schema([
-            Item.self,
             Vehicle.self,
             Trailer.self,
             DriveLog.self,
