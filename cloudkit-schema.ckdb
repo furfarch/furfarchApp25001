@@ -1,0 +1,106 @@
+DEFINE SCHEMA
+
+    RECORD TYPE CD_Item (
+        CD_timestamp    TIMESTAMP,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE
+    );
+
+    RECORD TYPE CD_Checklist (
+        CD_id           STRING,
+        CD_lastEdited   TIMESTAMP SORTABLE,
+        CD_title        STRING,
+        CD_trailer      REFERENCE,
+        CD_vehicle      REFERENCE,
+        CD_vehicleType  STRING,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE
+    );
+
+    RECORD TYPE CD_ChecklistItem (
+        CD_checklist    REFERENCE,
+        CD_id           STRING,
+        CD_note         STRING,
+        CD_section      STRING,
+        CD_state        STRING,
+        CD_title        STRING,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE
+    );
+
+    RECORD TYPE CD_DriveLog (
+        CD_checklist    REFERENCE,
+        CD_date         TIMESTAMP SORTABLE,
+        CD_id           STRING,
+        CD_kmEnd        INT64,
+        CD_kmStart      INT64,
+        CD_lastEdited   TIMESTAMP,
+        CD_notes        STRING,
+        CD_reason       STRING,
+        CD_vehicle      REFERENCE,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE
+    );
+
+    RECORD TYPE CD_Trailer (
+        CD_brandModel    STRING,
+        CD_color         STRING,
+        CD_id            STRING,
+        CD_lastEdited    TIMESTAMP SORTABLE,
+        CD_linkedVehicle REFERENCE,
+        CD_notes         STRING,
+        CD_photoData     BYTES,
+        CD_plate         STRING,
+        "___createTime"  TIMESTAMP,
+        "___createdBy"   REFERENCE,
+        "___etag"        STRING,
+        "___modTime"     TIMESTAMP,
+        "___modifiedBy"  REFERENCE,
+        "___recordID"    REFERENCE QUERYABLE
+    );
+
+    RECORD TYPE CD_Vehicle (
+        CD_brandModel   STRING,
+        CD_color        STRING,
+        CD_id           STRING,
+        CD_lastEdited   TIMESTAMP SORTABLE,
+        CD_notes        STRING,
+        CD_photoData    BYTES,
+        CD_plate        STRING,
+        CD_trailer      REFERENCE,
+        CD_type         STRING,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE
+    );
+
+    RECORD TYPE Users (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        roles           LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
