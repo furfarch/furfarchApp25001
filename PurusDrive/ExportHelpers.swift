@@ -43,7 +43,7 @@ enum ExportHelpers {
         lines.append("Last Edited: \(ISO8601DateFormatter().string(from: checklist.lastEdited))")
         lines.append("")
 
-        let grouped = Dictionary(grouping: checklist.items, by: { $0.section })
+        let grouped = Dictionary(grouping: checklist.items ?? [], by: { $0.section })
         for section in grouped.keys.sorted() {
             lines.append("== \(section) ==")
             for item in grouped[section] ?? [] {
@@ -55,7 +55,7 @@ enum ExportHelpers {
     }
 
     static func checklistHTML(_ checklist: Checklist) -> String {
-        let grouped = Dictionary(grouping: checklist.items, by: { $0.section })
+        let grouped = Dictionary(grouping: checklist.items ?? [], by: { $0.section })
 
         var body = "<h1>Checklist: \(escape(checklist.title))</h1>"
         body += "<p><strong>Vehicle Type:</strong> \(escape(checklist.vehicleType.displayName))<br/>"
@@ -99,7 +99,7 @@ enum ExportHelpers {
             title: checklist.title,
             vehicleType: checklist.vehicleType.rawValue,
             lastEdited: ISO8601DateFormatter().string(from: checklist.lastEdited),
-            items: checklist.items.map {
+            items: (checklist.items ?? []).map {
                 .init(id: $0.id, section: $0.section, title: $0.title, state: $0.state.rawValue, note: $0.note)
             }
         )

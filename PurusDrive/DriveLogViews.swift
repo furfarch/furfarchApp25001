@@ -156,7 +156,7 @@ struct DriveLogEditorView: View {
                     Button {
                         showChecklistRunner = true
                     } label: {
-                        Label("Run Checklist (\(cl.items.count) items)", systemImage: "checklist")
+                        Label("Run Checklist (\((cl.items ?? []).count) items)", systemImage: "checklist")
                     }
                 }
             }
@@ -248,7 +248,7 @@ struct ChecklistRunnerView: View {
     }
 
     private var sectionedItems: [String: [ChecklistItem]] {
-        Dictionary(grouping: checklist.items, by: { $0.section })
+        Dictionary(grouping: checklist.items ?? [], by: { $0.section })
     }
 
     private func items(in section: String) -> [ChecklistItem] {
@@ -257,10 +257,12 @@ struct ChecklistRunnerView: View {
 
     private func binding(for item: ChecklistItem) -> Binding<ChecklistItem> {
         Binding(get: {
-            checklist.items.first(where: { $0.id == item.id }) ?? item
+            (checklist.items ?? []).first(where: { $0.id == item.id }) ?? item
         }, set: { updated in
-            if let idx = checklist.items.firstIndex(where: { $0.id == item.id }) {
-                checklist.items[idx] = updated
+            guard var items = checklist.items else { return }
+            if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                items[idx] = updated
+                checklist.items = items
             }
         })
     }
