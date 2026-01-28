@@ -68,7 +68,7 @@ enum ExportService {
                 vehicleType: c.vehicleType.rawValue,
                 title: c.title,
                 lastEditedISO8601: iso.string(from: c.lastEdited),
-                items: c.items.map { .init(id: $0.id, section: $0.section, title: $0.title, state: $0.state.rawValue, note: $0.note) }
+                items: (c.items ?? []).map { .init(id: $0.id, section: $0.section, title: $0.title, state: $0.state.rawValue, note: $0.note) }
             )
         }
 

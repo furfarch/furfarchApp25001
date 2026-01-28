@@ -132,7 +132,7 @@ struct ChecklistEditorView: View {
     @State private var selectedSectionIndex: Int = 0
 
     private var orderedSections: [String] {
-        let present = Set(checklist.items.map { $0.section })
+        let present = Set((checklist.items ?? []).map { $0.section })
         let preferred = ChecklistTemplates.sectionOrder(for: checklist.vehicleType)
         let inPreferred = preferred.filter { present.contains($0) }
         let remainder = present.subtracting(inPreferred).sorted()
@@ -144,7 +144,7 @@ struct ChecklistEditorView: View {
     }
 
     private func items(in section: String) -> [ChecklistItem] {
-        let sectionItems = checklist.items.filter { $0.section == section }
+        let sectionItems = (checklist.items ?? []).filter { $0.section == section }
         guard let order = subsectionOrderBySection[section], !order.isEmpty else {
             return sectionItems.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         }
@@ -165,10 +165,13 @@ struct ChecklistEditorView: View {
 
     private func binding(for item: ChecklistItem) -> Binding<ChecklistItem> {
         Binding(get: {
-            checklist.items.first(where: { $0.id == item.id }) ?? item
+            (checklist.items ?? []).first(where: { $0.id == item.id }) ?? item
         }, set: { updated in
-            if let idx = checklist.items.firstIndex(where: { $0.id == updated.id }) {
-                checklist.items[idx] = updated
+            if let idx = (checklist.items ?? []).firstIndex(where: { $0.id == updated.id }) {
+                if checklist.items == nil {
+                    checklist.items = []
+                }
+                checklist.items![idx] = updated
             }
         })
     }
