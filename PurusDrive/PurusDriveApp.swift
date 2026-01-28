@@ -13,6 +13,7 @@
 
 import SwiftUI
 import SwiftData
+import CloudKit
 
 private struct StorageInitErrorView: View {
     let message: String
@@ -66,9 +67,11 @@ struct PurusDriveApp: App {
         let storageRaw = UserDefaults.standard.string(forKey: Self.storageLocationKey) ?? StorageLocation.local.rawValue
         let wantsICloud = (storageRaw == StorageLocation.icloud.rawValue)
 
+        // Set diagnostics for in-app display
+        CloudKitDiagnostics.storageMode = wantsICloud ? "iCloud" : "Local"
+
         // Helper to avoid duplicating fallback logic
         func makeLocalContainer() -> ModelContainer? {
-            // Explicitly set URL for local storage in application support directory
             let localConfig = ModelConfiguration(
                 schema: schema,
                 url: URL.applicationSupportDirectory.appending(path: Self.localStoreFileName),
@@ -87,15 +90,24 @@ struct PurusDriveApp: App {
                 url: URL.applicationSupportDirectory.appending(path: Self.cloudStoreFileName),
                 cloudKitDatabase: .private(Self.cloudContainerId)
             )
-            if let c = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+            do {
+                let c = try ModelContainer(for: schema, configurations: [cloudConfig])
                 self.container = c
                 self.initErrorMessage = nil
-            } else if let local = makeLocalContainer() {
-                self.container = local
-                self.initErrorMessage = "iCloud storage was selected but couldn’t be opened. Using local storage instead."
-            } else {
-                self.container = nil
-                self.initErrorMessage = "Could not open iCloud store, local store, or in-memory store."
+                CloudKitDiagnostics.containerCreationResult = "Success"
+                CloudKitDiagnostics.containerError = nil
+            } catch {
+                CloudKitDiagnostics.containerCreationResult = "Failed"
+                CloudKitDiagnostics.containerError = error.localizedDescription
+
+                if let local = makeLocalContainer() {
+                    self.container = local
+                    self.initErrorMessage = "iCloud storage was selected but couldn't be opened. Using local storage instead. Error: \(error.localizedDescription)"
+                    CloudKitDiagnostics.storageMode = "Local (fallback)"
+                } else {
+                    self.container = nil
+                    self.initErrorMessage = "Could not open iCloud store, local store, or in-memory store."
+                }
             }
         } else {
             if let local = makeLocalContainer() {
