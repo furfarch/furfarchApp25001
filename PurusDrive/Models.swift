@@ -46,13 +46,13 @@ enum ChecklistItemState: String, Codable, CaseIterable {
 }
 
 @Model
-final class Vehicle: Hashable {
-    var id: UUID
-    var type: VehicleType
-    var brandModel: String
-    var color: String
-    var plate: String
-    var notes: String
+final class Vehicle {
+    var id: UUID = UUID()
+    var type: VehicleType = .car
+    var brandModel: String = ""
+    var color: String = ""
+    var plate: String = ""
+    var notes: String = ""
     var photoData: Data?
 
     // Relationship inferred by SwiftData.
@@ -61,9 +61,9 @@ final class Vehicle: Hashable {
     var checklists: [Checklist] = []
     var driveLogs: [DriveLog] = []
 
-    var lastEdited: Date
+    var lastEdited: Date = Date.now
 
-    init(type: VehicleType, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = Date.now, photoData: Data? = nil) {
+    init(type: VehicleType = .car, brandModel: String = "", color: String = "", plate: String = "", notes: String = "", trailer: Trailer? = nil, lastEdited: Date = Date.now, photoData: Data? = nil) {
         self.id = UUID()
         self.type = type
         self.brandModel = brandModel
@@ -74,24 +74,15 @@ final class Vehicle: Hashable {
         self.trailer = trailer
         self.lastEdited = lastEdited
     }
-
-    // MARK: - Hashable conformance based on id for SwiftUI Picker compatibility
-    static func == (lhs: Vehicle, rhs: Vehicle) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
 }
 
 @Model
-final class Trailer: Hashable {
-    var id: UUID
-    var brandModel: String
-    var color: String
-    var plate: String
-    var notes: String
+final class Trailer {
+    var id: UUID = UUID()
+    var brandModel: String = ""
+    var color: String = ""
+    var plate: String = ""
+    var notes: String = ""
     var photoData: Data?
 
     // Relationship inferred by SwiftData.
@@ -99,7 +90,7 @@ final class Trailer: Hashable {
 
     var checklists: [Checklist] = []
 
-    var lastEdited: Date
+    var lastEdited: Date = Date.now
 
     init(brandModel: String = "", color: String = "", plate: String = "", notes: String = "", lastEdited: Date = Date.now, photoData: Data? = nil) {
         self.id = UUID()
@@ -110,36 +101,27 @@ final class Trailer: Hashable {
         self.photoData = photoData
         self.lastEdited = lastEdited
     }
-
-    // MARK: - Hashable conformance based on id for SwiftUI Picker compatibility
-    static func == (lhs: Trailer, rhs: Trailer) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
 }
 
 @Model
 final class DriveLog {
-    var id: UUID
+    var id: UUID = UUID()
 
     // CloudKit-safe optional relationship.
     var vehicle: Vehicle?
 
-    var date: Date
-    var reason: String
-    var kmStart: Int
-    var kmEnd: Int
-    var notes: String
+    var date: Date = Date.now
+    var reason: String = ""
+    var kmStart: Int = 0
+    var kmEnd: Int = 0
+    var notes: String = ""
 
     // Relationship inferred by SwiftData.
     var checklist: Checklist?
 
-    var lastEdited: Date
+    var lastEdited: Date = Date.now
 
-    init(vehicle: Vehicle?, date: Date = Date.now, reason: String = "", kmStart: Int = 0, kmEnd: Int = 0, notes: String = "", checklist: Checklist? = nil, lastEdited: Date = Date.now) {
+    init(vehicle: Vehicle? = nil, date: Date = Date.now, reason: String = "", kmStart: Int = 0, kmEnd: Int = 0, notes: String = "", checklist: Checklist? = nil, lastEdited: Date = Date.now) {
         self.id = UUID()
         self.vehicle = vehicle
         self.date = date
@@ -154,9 +136,9 @@ final class DriveLog {
 
 @Model
 final class Checklist {
-    var id: UUID
-    var vehicleType: VehicleType
-    var title: String
+    var id: UUID = UUID()
+    var vehicleType: VehicleType = .car
+    var title: String = ""
 
     var items: [ChecklistItem] = []
 
@@ -166,10 +148,10 @@ final class Checklist {
 
     var driveLogs: [DriveLog] = []
 
-    var lastEdited: Date
+    var lastEdited: Date = Date.now
 
-    init(vehicleType: VehicleType,
-         title: String,
+    init(vehicleType: VehicleType = .car,
+         title: String = "",
          items: [ChecklistItem] = [],
          lastEdited: Date = Date.now,
          vehicle: Vehicle? = nil,
@@ -187,10 +169,10 @@ final class Checklist {
 
 @Model
 final class ChecklistItem {
-    var id: UUID
-    var section: String
-    var title: String
-    var state: ChecklistItemState
+    var id: UUID = UUID()
+    var section: String = ""
+    var title: String = ""
+    var state: ChecklistItemState = .notSelected
     var note: String?
 
     // Relationship inferred by SwiftData.
