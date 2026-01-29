@@ -69,7 +69,7 @@ struct CreateTrailerView: View {
                     onCreate(t)
                     dismiss()
                 }) {
-                    Image(systemName: "externaldrive")
+                    Image(systemName: "internaldrive.fill")
                 }
                 .accessibilityLabel("Save")
             }

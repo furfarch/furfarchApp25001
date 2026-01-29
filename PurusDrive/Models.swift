@@ -55,14 +55,8 @@ final class Vehicle {
     var notes: String = ""
     var photoData: Data?
 
-    // Explicit relationship with inverse for CloudKit compatibility
-    @Relationship(inverse: \Trailer.linkedVehicle)
     var trailer: Trailer?
-
-    @Relationship(deleteRule: .nullify, inverse: \Checklist.vehicle)
     var checklists: [Checklist]? = nil
-
-    @Relationship(deleteRule: .nullify, inverse: \DriveLog.vehicle)
     var driveLogs: [DriveLog]? = nil
 
     var lastEdited: Date = Date.now
@@ -89,10 +83,7 @@ final class Trailer {
     var notes: String = ""
     var photoData: Data?
 
-    // Inverse relationship - Vehicle owns this relationship
     var linkedVehicle: Vehicle?
-
-    @Relationship(deleteRule: .nullify, inverse: \Checklist.trailer)
     var checklists: [Checklist]? = nil
 
     var lastEdited: Date = Date.now
@@ -112,16 +103,12 @@ final class Trailer {
 final class DriveLog {
     var id: UUID = UUID()
 
-    // CloudKit-safe optional relationship - inverse defined on Vehicle
     var vehicle: Vehicle?
-
     var date: Date = Date.now
     var reason: String = ""
     var kmStart: Int = 0
     var kmEnd: Int = 0
     var notes: String = ""
-
-    // Inverse defined on Checklist
     var checklist: Checklist?
 
     var lastEdited: Date = Date.now
@@ -145,15 +132,9 @@ final class Checklist {
     var vehicleType: VehicleType = VehicleType.car
     var title: String = ""
 
-    // Explicit relationship with cascade delete for items
-    @Relationship(deleteRule: .cascade, inverse: \ChecklistItem.checklist)
     var items: [ChecklistItem]? = nil
-
-    // CloudKit-safe optional relationships - inverses defined on Vehicle/Trailer
     var vehicle: Vehicle?
     var trailer: Trailer?
-
-    @Relationship(deleteRule: .nullify, inverse: \DriveLog.checklist)
     var driveLogs: [DriveLog]? = nil
 
     var lastEdited: Date = Date.now
@@ -184,7 +165,6 @@ final class ChecklistItem {
     var state: ChecklistItemState = ChecklistItemState.notSelected
     var note: String?
 
-    // Inverse defined on Checklist
     var checklist: Checklist?
 
     init(section: String, title: String, state: ChecklistItemState = .notSelected, note: String? = nil) {
