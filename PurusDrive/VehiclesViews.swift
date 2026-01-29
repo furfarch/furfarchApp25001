@@ -524,7 +524,7 @@ struct VehicleFormView: View {
                 Button {
                     save()
                 } label: {
-                    Image(systemName: "sdcard.fill")
+                    Image(systemName: "internaldrive.fill")
                 }
                 .accessibilityLabel("Save")
             }
@@ -905,7 +905,7 @@ private struct NewTrailerFormView: View {
                         dismiss()
                     }
                 } label: {
-                    Image(systemName: "sdcard.fill")
+                    Image(systemName: "internaldrive.fill")
                 }
                 .accessibilityLabel("Save")
             }

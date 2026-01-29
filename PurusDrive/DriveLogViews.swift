@@ -179,7 +179,7 @@ struct DriveLogEditorView: View {
                 Button {
                     saveAndClose()
                 } label: {
-                    Image(systemName: "sdcard.fill")
+                    Image(systemName: "internaldrive.fill")
                 }
                 .accessibilityLabel("Save")
             }
