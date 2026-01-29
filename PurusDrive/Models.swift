@@ -140,6 +140,7 @@ final class Checklist {
     var vehicleType: VehicleType = VehicleType.car
     var title: String = ""
 
+    // Optional array for CloudKit compatibility, but typically initialized with empty/populated array
     var items: [ChecklistItem]? = nil
 
     // CloudKit-safe optional relationships.
@@ -160,7 +161,7 @@ final class Checklist {
         self.id = UUID()
         self.vehicleType = vehicleType
         self.title = title
-        // Store array as-is; SwiftData will handle empty arrays for CloudKit
+        // Initialize with provided array (empty by default) for convenience
         self.items = items
         self.lastEdited = lastEdited
         self.vehicle = vehicle
