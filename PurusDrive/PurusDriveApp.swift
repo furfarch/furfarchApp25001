@@ -93,24 +93,28 @@ struct PurusDriveApp: App {
         }
 
         if wantsICloud {
-            // For CloudKit, don't specify a custom URL - let SwiftData manage the store location
-            let cloudConfig = ModelConfiguration(
-                schema: schema,
-                cloudKitDatabase: .private(Self.cloudContainerId)
-            )
+            // For CloudKit, use minimal configuration - let SwiftData infer everything
             do {
-                let c = try ModelContainer(for: schema, configurations: [cloudConfig])
+                let cloudConfig = ModelConfiguration(
+                    cloudKitDatabase: .private(Self.cloudContainerId)
+                )
+                let c = try ModelContainer(
+                    for: Vehicle.self, Trailer.self, DriveLog.self, Checklist.self, ChecklistItem.self,
+                    configurations: cloudConfig
+                )
                 self.container = c
                 self.initErrorMessage = nil
                 CloudKitDiagnostics.containerCreationResult = "Success"
                 CloudKitDiagnostics.containerError = nil
             } catch {
+                // Capture full error details
+                let fullError = String(describing: error)
                 CloudKitDiagnostics.containerCreationResult = "Failed"
-                CloudKitDiagnostics.containerError = error.localizedDescription
+                CloudKitDiagnostics.containerError = fullError
 
                 if let local = makeLocalContainer() {
                     self.container = local
-                    self.initErrorMessage = "iCloud storage was selected but couldn't be opened. Using local storage instead. Error: \(error.localizedDescription)"
+                    self.initErrorMessage = "iCloud error: \(fullError)"
                     CloudKitDiagnostics.storageMode = "Local (fallback)"
                 } else {
                     self.container = nil
