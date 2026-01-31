@@ -91,6 +91,26 @@ final class CloudKitSyncService {
         }
     }
 
+    /// Deletes all records in the app's private database zone.
+    func deleteAllFromCloud() async {
+        do {
+            // Delete in each record type
+            try await deleteAll(ofType: "CD_ChecklistItem")
+            try await deleteAll(ofType: "CD_Checklist")
+            try await deleteAll(ofType: "CD_DriveLog")
+            try await deleteAll(ofType: "CD_Trailer")
+            try await deleteAll(ofType: "CD_Vehicle")
+            print("CloudKitSyncService: Deleted all records from cloud")
+        } catch {
+            print("CloudKitSyncService: deleteAllFromCloud error - \(error)")
+        }
+    }
+
+    /// Pulls all data from CloudKit and imports into local store.
+    func pullAllFromCloud() async {
+        await fetchAllFromCloud()
+    }
+
     // MARK: - Zone Management
 
     private func ensureZoneExists() async throws {
@@ -489,5 +509,21 @@ final class CloudKitSyncService {
         guard recordName.hasPrefix(prefix) else { return nil }
         let uuidString = String(recordName.dropFirst(prefix.count))
         return UUID(uuidString: uuidString)
+    }
+
+    private func deleteAll(ofType recordType: String) async throws {
+        let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
+        let records = try await fetchRecords(query: query)
+        guard !records.isEmpty else { return }
+        let op = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: records.map { $0.recordID })
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            op.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success: continuation.resume()
+                case .failure(let error): continuation.resume(throwing: error)
+                }
+            }
+            privateDatabase.add(op)
+        }
     }
 }

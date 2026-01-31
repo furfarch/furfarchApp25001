@@ -49,12 +49,16 @@ struct PurusDriveApp: App {
     private static let storageLocationKey = "storageLocation"
     private static let cloudContainerId = "iCloud.com.purus.driver"
     private static let localStoreFileName = "default.store"
+    private static let migrationNeededKey = "needsStorageMigration"
+    private static let lastStorageModeKey = "lastStorageMode"
 
     private let container: ModelContainer?
     private let initErrorMessage: String?
     private let cloudSyncService = CloudKitSyncService.shared
 
     @Environment(\.scenePhase) private var scenePhase
+    
+    @StateObject private var migrationProgress = MigrationProgress()
 
     init() {
         // Check if local store exists
@@ -75,12 +79,25 @@ struct PurusDriveApp: App {
             ChecklistItem.self,
         ])
 
-        // Re-read after potential reset
-        let finalStorageRaw = UserDefaults.standard.string(forKey: Self.storageLocationKey) ?? StorageLocation.local.rawValue
+        // Resolve storage preference: default to Local on true fresh install, otherwise respect saved preference
+        let savedRaw = UserDefaults.standard.string(forKey: Self.storageLocationKey)
+        let finalStorageRaw: String
+        if !localStoreExists {
+            // True fresh install (no local store) — default to Local and clear any stale preference
+            UserDefaults.standard.set(StorageLocation.local.rawValue, forKey: Self.storageLocationKey)
+            finalStorageRaw = StorageLocation.local.rawValue
+        } else if let savedRaw {
+            finalStorageRaw = savedRaw
+        } else {
+            finalStorageRaw = StorageLocation.local.rawValue
+        }
         let wantsICloud = (finalStorageRaw == StorageLocation.icloud.rawValue)
 
         // Set diagnostics for in-app display
         CloudKitDiagnostics.storageMode = wantsICloud ? "iCloud" : "Local"
+        if UserDefaults.standard.string(forKey: Self.lastStorageModeKey) == nil {
+            UserDefaults.standard.set(finalStorageRaw, forKey: Self.lastStorageModeKey)
+        }
 
         // Always use local storage - CloudKit sync is handled manually
         let localConfig = ModelConfiguration(
@@ -123,14 +140,20 @@ struct PurusDriveApp: App {
             if let container {
                 ContentView()
                     .modelContainer(container)
+                    .environmentObject(migrationProgress)
+                    .overlay(alignment: .top) {
+                        MigrationOverlayView()
+                            .environmentObject(migrationProgress)
+                            .padding(.top, 8)
+                    }
                     .task {
-                        // Sync on app launch if iCloud is enabled
+                        await handleStorageModeTransitionIfNeeded()
                         await syncIfCloudEnabled()
                     }
                     .onChange(of: scenePhase) { oldPhase, newPhase in
                         if newPhase == .active {
-                            // Sync when app becomes active
                             Task {
+                                await handleStorageModeTransitionIfNeeded()
                                 await syncIfCloudEnabled()
                             }
                         }
@@ -142,12 +165,44 @@ struct PurusDriveApp: App {
     }
 
     @MainActor
+    private func handleStorageModeTransitionIfNeeded() async {
+        let current = UserDefaults.standard.string(forKey: Self.storageLocationKey) ?? StorageLocation.local.rawValue
+        let last = UserDefaults.standard.string(forKey: Self.lastStorageModeKey) ?? StorageLocation.local.rawValue
+
+        guard current != last else { return }
+        UserDefaults.standard.set(current, forKey: Self.lastStorageModeKey)
+
+        if current == StorageLocation.icloud.rawValue {
+            migrationProgress.start(title: "Migrating to iCloud…", message: "Uploading local data")
+            await cloudSyncService.pushAllToCloud()
+            migrationProgress.update(message: "Syncing with iCloud")
+            await cloudSyncService.performFullSync()
+            migrationProgress.succeed(message: "Now syncing across devices")
+        } else {
+            migrationProgress.start(title: "Migrating to Local…", message: "Fetching from iCloud")
+            await cloudSyncService.fetchAllFromCloud()
+            migrationProgress.update(message: "Removing data from iCloud")
+            await cloudSyncService.deleteAllFromCloud()
+            migrationProgress.succeed(message: "iCloud cleared; local only")
+        }
+    }
+
+    @MainActor
     private func syncIfCloudEnabled() async {
         let storageRaw = UserDefaults.standard.string(forKey: Self.storageLocationKey) ?? StorageLocation.local.rawValue
         let wantsICloud = (storageRaw == StorageLocation.icloud.rawValue)
 
-        if wantsICloud {
-            await cloudSyncService.performFullSync()
+        guard wantsICloud else { return }
+
+        // First-time migration: ensure we push local data up once after switching to iCloud
+        let migrationFlagKey = "didInitialCloudMigration"
+        if UserDefaults.standard.bool(forKey: migrationFlagKey) == false {
+            await cloudSyncService.pushAllToCloud()
+            UserDefaults.standard.set(true, forKey: migrationFlagKey)
         }
+
+        // Regular full sync thereafter
+        await cloudSyncService.performFullSync()
     }
 }
+

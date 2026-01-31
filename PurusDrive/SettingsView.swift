@@ -133,6 +133,7 @@ struct SettingsView: View {
                 }
 
                 storageLocationRaw = newValue.rawValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: "storageLocation")
                 // Switching stores requires app restart because ModelContainer is created at launch.
                 showRestartHint = true
             }
